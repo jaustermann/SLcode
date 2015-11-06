@@ -5,6 +5,7 @@
 
 % add paths when run for the first time.
 % addpath SLFunctions
+% addpath SLFunctions/upslope
 % addpath '/Users/jackyaustermann/Documents/MATLAB/m_map'
 
 %% Parameters & Input 
@@ -39,14 +40,23 @@ lon = lon_GL;
 % ICE
 % --------------------------------
 
-load WAIS 
+% load WAIS 
+load ice5g_griddata
 
-ice_0_nointerp = ice_Ant;
-ice_j_nointerp = ice_EAIS;
+ind_0 = find(ice_time == 12);
+ind_j = find(ice_time == 11.5);
+
+% already on Gauss Legendre grid
+ice_0_nointerp = squeeze(ice5g_grid(ind_0,:,:));
+ice_j_nointerp = squeeze(ice5g_grid(ind_j,:,:));
 
 % interpolate ice masks on common grid
-ice_0 = interp2(lon_WAIS,lat_WAIS,ice_0_nointerp,lon_out, lat_out);
-ice_j = interp2(lon_WAIS,lat_WAIS,ice_j_nointerp,lon_out, lat_out);
+ice_0 = interp2(ice_long,ice_lat,ice_0_nointerp,lon_out, lat_out);
+ice_j = interp2(ice_long,ice_lat,ice_j_nointerp,lon_out, lat_out);
+
+% patch in zeros
+ice_0(isnan(ice_0) == 1) = 0;
+ice_j(isnan(ice_j) == 1) = 0;
 
 del_ice = ice_j - ice_0; 
 
@@ -105,11 +115,11 @@ epsilon = 10^-4; % convergence criterion
 % j = after
 
 % set up present-day topo and ocean function 
-topo_0 = topo0; % already includes ice and dynamic topography
+topo_0 = topo0 + ice_0; % already includes ice and dynamic topography
 oc_0 = sign_01(topo_0);
 
 % set up topography and ocean function after the ice change
-topo_j = topo_0 + del_ice; % del_ice is negative -> subtract ice that is melted
+topo_j = topo_0 + ice_j; % del_ice is negative -> subtract ice that is melted
 oc_j = sign_01(topo_j);
 
 % calculate change in sediments and decompose into spherical harmonics
@@ -117,6 +127,9 @@ Sed_lm = spa2sph(del_sed,maxdeg,lon,colat,P_lm_spa2sph);
 
 % expand ocean function into spherical harmonics
 oc0_lm = spa2sph(oc_0,maxdeg,lon,colat,P_lm_spa2sph);
+
+% no proglacial lakes in step 0 
+P_0 = zeros(size(oc_j));
 
 
 % initial values for convergence
@@ -144,7 +157,11 @@ for k = 1:k_max % loop for sea level and topography iteration
         del_ice_corrected = ice_j_corr - ice_0; 
         
         deli_lm = spa2sph(del_ice_corrected,maxdeg,lon,colat,P_lm_spa2sph);
-
+        
+        % determine the depression adjacent to ice sheets;
+        P_j = calc_lake(ice_j_corr,oc_j,topo_j,lat_out,lon_out);
+        delP = P_j - P_0;
+        delP_lm = spa2sph(delP,maxdeg,lon,colat,P_lm_spa2sph);
         
         % calculate topography correction
         TO = topo_0.*(oc_j-oc_0);
@@ -157,14 +174,15 @@ for k = 1:k_max % loop for sea level and topography iteration
             % initial guess of sea level change is just to distribute the
             % ice over the oceans
             delS_lm = ocj_lm/ocj_lm(1)*(-rho_ice/rho_water*deli_lm(1) + ...
-                TO_lm(1));
+                TO_lm(1) - delP_lm(1));
             % convert into spherical harmonics
             delS_init = sph2spa(delS_lm,maxdeg,lon,colat,P_lm_sph2spa);
             
         end
         
         % calculate loading term
-        L_lm = rho_ice*deli_lm + rho_water*delS_lm + rho_sed*Sed_lm;
+        L_lm = rho_ice*deli_lm + rho_water*delS_lm + rho_sed*Sed_lm + ...
+            rho_water*delP_lm;
 
         % calculate contribution from rotation
         La_lm = calc_rot(L_lm,k_el,k_el_tide);
@@ -172,7 +190,7 @@ for k = 1:k_max % loop for sea level and topography iteration
         % calculate sea level perturbation
         % add ice and sea level and multiply with love numbers
         % DT doesn't load!
-        delSLcurl_lm_fl = E_lm .* T_lm .* (rho_ice*deli_lm + rho_water*delS_lm + rho_sed*Sed_lm) + ...
+        delSLcurl_lm_fl = E_lm .* T_lm .* L_lm + ...
             1/g*E_lm_T.*La_lm;
 
         % convert to spherical harmonics and subtract terms that are part
@@ -187,7 +205,7 @@ for k = 1:k_max % loop for sea level and topography iteration
 
         % calculate eustatic sea level perturbation (delta Phi / g)
         delPhi_g = 1/ocj_lm(1) * (- rho_ice/rho_water*deli_lm(1) ...
-            - RO_lm(1) + TO_lm(1));
+            - RO_lm(1) + TO_lm(1) - delP_lm(1));
 
         % calculate overall perturbation of sea level over oceans
         % (spatially varying field and constant offset)
@@ -225,51 +243,23 @@ for k = 1:k_max % loop for sea level and topography iteration
 
 end
 
-% calculate the scaling to normalize the fingerprint (it's normalized to be
-% one on average, when averaged over the final ocean basin). 
-% calculate change in sea level over final ocean basin
-del_scaling =(delSL + del_ice_corrected).*oc_j;
-% get the average of that when spreading the water over the whole globe
-sca = spa2sph(del_scaling,1,lon,colat);
-% get the average of that when spreading the water only over the oceans.
-scaling_fact = sca(1)/ocj_lm(1);  
 
 
 %% Plot results
 
 % We only want the sea level change cause by melted ice, so subtract
 % del_ice
-SL_change_rot = delSL + del_ice_corrected;
-% normalize it by the scaling factor
-plotSL = SL_change_rot/scaling_fact;
-
-% construct identical colormap to Mitrovica 2009 paper
-MyColorMap = [238   44  37
-    211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244
-    173 224 235;173 224 235;173 224 235;173 224 235;173 224 235;173 224 235;173 224 235;173 224 235;173 224 235;173 224 235
-    163 201 235
-    111 147 201
-    96  103 175
-    74  102 176
-    68  87  165
-    58  84  163
-    53  69  154
-    44  47  137
-    38  35  103
-    19  15  54
-    0   0   0
-    0   0   0];
+SL_change = delSL + del_ice_corrected;
+plotSL = SL_change - SL_save;
 
 % plot
 figure
-m_proj('hammer-aitoff','clongitude',0);
+m_proj('robinson','clongitude',0);
 m_pcolor([lon_out(:,end/2+1:end)-360 lon_out(:,1:end/2)],lat_out,...
     [plotSL(:,end/2+1:end) plotSL(:,1:end/2)])
 m_coast('color',[0 0 0]);
 m_grid('box','fancy','xticklabels',[],'yticklabels',[]);
 shading flat
 colorbar
-colormap(MyColorMap/255)
-caxis( [-0.05, 1.6] )
-title('Sea level fingerprint of West Antarctic Ice Sheet collapse')
+colormap(jet)
 
