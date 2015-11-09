@@ -5,12 +5,11 @@
 
 % add paths when run for the first time.
 % addpath SLFunctions
-% addpath SLFunctions/upslope
 % addpath '/Users/jackyaustermann/Documents/MATLAB/m_map'
 
 %% Parameters & Input 
 % Specify maximum degree to which spherical transformations should be done
-maxdeg = 64;
+maxdeg = 128;
 
 % parameters
 rho_ice = 916;
@@ -42,6 +41,8 @@ lon = lon_GL;
 
 % load WAIS 
 load ice5g_griddata
+ice = cell(size(ice_time));
+ice_time_new = zeros(size(ice_time));
 
 for i = 1:length(ice_time)
 
@@ -116,13 +117,13 @@ epsilon = 10^-3; % convergence criterion
 
 % set up initial topography and ocean function
 topo_0 = topo0 + ice{1}; % already includes ice and dynamic topography
-oc_0 = sign_01(topo{1});
+oc_0 = sign_01(topo_0);
 
 % expand ocean function into spherical harmonics
 oc0_lm = spa2sph(oc_0,maxdeg,lon,colat,P_lm_spa2sph);
 
 % no proglacial lakes in step 0 
-P_0 = zeros(size(oc_j));
+P_0 = zeros(size(oc_0));
 
 topo = cell(1,length(ice_time));
 SL_change = cell(1,length(ice_time));
@@ -250,7 +251,8 @@ for t_it = 2:length(ice_time) % loop over time
             if chi < epsilon;
                 conv = 'converged!';
                 disp(['Finished time ' num2str(ice_time_new(t_it))...
-                'kyr. Number of iterations ' num2str(k) '. delphi is ' num2str(delPhi_g)])
+                'kyr. Number of iterations ' num2str(k) '. delphi is ' num2str(delPhi_g) ...
+                '. del Lakes vol is ' num2str(delP_lm(1))])
                % disp(['Converged after iteration ' num2str(k) '. Chi was ' num2str(chi) '.'])
             else
                 conv = 'not converged yet';
@@ -272,22 +274,180 @@ for t_it = 2:length(ice_time) % loop over time
     
 end
 
-
+Lakes{1} = zeros(size(Lakes{2}));
 
 %% Plot results
 
 % We only want the sea level change cause by melted ice, so subtract
 % del_ice
-% SL_change = delSL + del_ice_corrected;
-% 
-% % plot
-% figure
-% m_proj('robinson','clongitude',0);
-% m_pcolor([lon_out(:,end/2+1:end)-360 lon_out(:,1:end/2)],lat_out,...
-%     [plotSL(:,end/2+1:end) plotSL(:,1:end/2)])
-% m_coast('color',[0 0 0]);
-% m_grid('box','fancy','xticklabels',[],'yticklabels',[]);
-% shading flat
-% colorbar
-% colormap(jet)
+plotSL = SL_change{ice_time_new==40};
 
+% plot
+figure
+m_proj('robinson','clongitude',0);
+m_pcolor([lon_out(:,end/2+1:end)-360 lon_out(:,1:end/2)],lat_out,...
+    [plotSL(:,end/2+1:end) plotSL(:,1:end/2)])
+m_coast('color',[0 0 0]);
+m_grid('box','fancy','xticklabels',[],'yticklabels',[]);
+shading flat
+colorbar
+colormap(jet)
+
+%% Make video
+
+time_fig = 17;
+
+out = cptcmap('GMT_globe');
+
+% We only want the sea level change cause by melted ice, so subtract
+% del_ice
+plotSL = topo{ice_time_new==time_fig} - ice{ice_time_new==time_fig};
+
+% plot
+figure
+ax1 = axes;
+%m_proj('lambert','longitude',[200 330],'latitude',[15 80]);
+pcolor(ax1,lon_out,lat_out, plotSL)
+%m_coast('color',[0 0 0]);
+%m_grid('box','fancy','xticklabels',[],'yticklabels',[]);
+shading flat
+caxis([-6000 6000])
+%colorbar
+hold on
+
+contour(ax1,lon_out,lat_out,plotSL,[0 0],'k')
+
+% add ice plot
+ice_plot = ice{ice_time_new==time_fig};
+ice_plot(ice_plot == 0) = NaN;
+
+
+ax2 = axes;
+pcolor(ax2,lon_out,lat_out,ice_plot)
+shading flat
+caxis([-2000,5000])
+
+% add lake plot plot
+lake_plot = Lakes{ice_time_new==time_fig};
+lake_plot(lake_plot == 0) = NaN;
+
+ax3 = axes;
+pcolor(ax3,lon_out,lat_out,lake_plot)
+shading flat
+caxis([0 700])
+
+linkaxes([ax1,ax2,ax3])
+
+ax2.Visible = 'off';
+ax2.XTick = [];
+ax2.YTick = [];
+
+ax3.Visible = 'off';
+ax3.XTick = [];
+ax3.YTick = [];
+
+colormap(ax1,out)
+colormap(ax2,'gray')
+colormap(ax3,'cool')
+
+axis([200 330 15 80])
+
+
+%%
+
+clear A
+out = cptcmap('GMT_globe');
+
+axis([-0.6 0.6 -0.4 0.45])                    
+set(gca,'nextplot','replacechildren');
+
+video_ind = 1;
+init_ind = 1;
+
+for i = find(ice_time_new == 17):find(ice_time_new == 7)
+    
+    if init_ind == 1
+        A(1:length(find(ice_time_new == 1):length(ice_time_new))) ...
+            = struct('cdata', [],'colormap', []);
+        init_ind = 2;
+    end
+    
+    hFig = figure(1);
+    hold on
+    set(hFig, 'Position', [100 100 800 500])
+    
+   
+
+% We only want the sea level change cause by melted ice, so subtract
+% del_ice
+plotSL = topo{i} - ice{i};
+
+% plot
+ax1 = axes;
+%m_proj('lambert','longitude',[200 330],'latitude',[15 80]);
+pcolor(ax1,lon_out,lat_out, plotSL)
+%m_coast('color',[0 0 0]);
+%m_grid('box','fancy','xticklabels',[],'yticklabels',[]);
+shading flat
+caxis([-6000 6000])
+%colorbar
+hold on
+
+contour(ax1,lon_out,lat_out,plotSL,[0 0],'k')
+
+% add ice plot
+ice_plot = ice{i};
+ice_plot(ice_plot == 0) = NaN;
+
+ax2 = axes;
+pcolor(ax2,lon_out,lat_out,ice_plot)
+shading flat
+caxis([-2000,5000])
+
+% add lake plot plot
+lake_plot = Lakes{i};
+lake_plot(lake_plot == 0) = NaN;
+
+ax3 = axes;
+pcolor(ax3,lon_out,lat_out,lake_plot)
+shading flat
+caxis([0,700])
+
+linkaxes([ax1,ax2,ax3])
+
+ax1.Visible = 'off';
+ax1.XTick = [];
+ax1.YTick = [];
+
+ax2.Visible = 'off';
+ax2.XTick = [];
+ax2.YTick = [];
+
+ax3.Visible = 'off';
+ax3.XTick = [];
+ax3.YTick = [];
+
+colormap(ax1,out)
+colormap(ax2,'gray')
+colormap(ax3,'cool')
+
+axis([200 330 15 80])
+
+text(205,25,[num2str(ice_time_new(i)) ' ka cal BP'],'FontSize',20)
+
+    
+%     title(['Time: ' num2str(ice_time_new(i)) ' ka cal BP'],...
+%     'FontName','Arial','FontSize',12);
+    
+    pause(2);
+    A(:,video_ind)=getframe(gcf); 
+    video_ind = video_ind+1;
+    close(1)
+    
+end
+
+cd output_movies
+
+movie2avi(A,'Lakes_video.avi', 'compression', 'None','fps',1,'quality',100)
+
+cd ..
