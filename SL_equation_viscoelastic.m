@@ -9,7 +9,10 @@
 
 %% Parameters & Input 
 % Specify maximum degree to which spherical transformations should be done
-maxdeg = 512;
+maxdeg = 64;
+
+% Include proglacial lakes
+include_lakes = 'n'; % choose between y (for yes) and n (for no)
 
 % parameters
 rho_ice = 916;
@@ -93,7 +96,7 @@ topo0 = interp2(lon_topo,lat_topo,topo_orig,lon_out, lat_out);
 % prepare love numbers in suitable format and calculate T_lm and E_lm 
 % to calculate the fluid case, switch h_el to h_fl, k_el to k_fl and same
 % for tidal love numbers
-load SavedLN/LN_l120_ump5_lm5_512
+load SavedLN/LN_l90_VM2
 h_lm = love_lm(h_el, maxdeg);
 k_lm = love_lm(k_el, maxdeg);
 h_lm_tide = love_lm(h_el_tide,maxdeg);
@@ -121,13 +124,15 @@ max_topo_diff = 10; % convergence criterion
 % set up initial topography and ocean function
 topo_initial{1} = topo0 + ice{1}; % already includes ice and dynamic topography
 
-% no proglacial lakes in step 0 
-P_0 = zeros(size(topo0));
-Lakes{1} = zeros(size(topo0));
+if include_lakes == 'y'
+    % no proglacial lakes in step 0 
+    P_0 = zeros(size(topo0));
+    Lakes = cell(1,length(ice_time));
+    Lakes{1} = zeros(size(topo0));
+end
 
 topo = cell(1,length(ice_time));
 SL_change = cell(1,length(ice_time));
-Lakes = cell(1,length(ice_time));
 deli_lm = cell(1,length(ice_time));
 delS_lm = cell(1,length(ice_time));
 delP_lm = cell(1,length(ice_time));
@@ -200,11 +205,15 @@ for topo_it = 1:topo_it_max;
 
                     deli_lm{t_it} = spa2sph(del_ice_corrected,maxdeg,lon,colat,P_lm_spa2sph);
 
-                    % determine the depression adjacent to ice sheets;
-                    P_j = calc_lake(ice_j_corr,oc_j,topo_j,lat_out,lon_out);
-                    delP = P_j - P_0;
-                    delP_lm{t_it} = spa2sph(delP,maxdeg,lon,colat,P_lm_spa2sph);
-
+                    if include_lakes == 'y'
+                        % determine the depression adjacent to ice sheets;
+                        P_j = calc_lake(ice_j_corr,oc_j,topo_j,lat_out,lon_out);
+                        delP = P_j - P_0;
+                        delP_lm{t_it} = spa2sph(delP,maxdeg,lon,colat,P_lm_spa2sph);
+                    else
+                        delP_lm{t_it} = zeros(size(deli_lm{t_it}));
+                    end
+                    
                     % calculate topography correction
                     TO = topo_0.*(oc_j-oc_0);
                     % expand TO function into spherical harmonics
@@ -313,9 +322,12 @@ for topo_it = 1:topo_it_max;
             topo_0 = topo_j; % initial topography for next timestep
             oc_0 = sign_01(topo_0);
             SL_change{t_it} = delSL + del_ice_corrected;
-            P_0 = P_j;
-            Lakes{t_it} = P_j;
             V_lm_0 = V_lm_j;
+            
+            if include_lakes == 'y'
+                P_0 = P_j;
+                Lakes{t_it} = P_j;
+            end
 
         end
         
@@ -357,8 +369,13 @@ shading flat
 colorbar
 colormap(jet)
 
-%% Plot one time slice
+%% Plot one time slice with ice and lakes
 
+if include_lakes == 'y'
+
+addpath ~/Documents/MATLAB/othercolor
+
+time_fig = 12;
 
 out = cptcmap('GMT_globe');
 
@@ -410,11 +427,12 @@ ax3.XTick = [];
 ax3.YTick = [];
 
 colormap(ax1,out)
-colormap(ax2,'gray')
-colormap(ax3,'cool')
+colormap(ax2,flipud(othercolor('Blues4')))
+colormap(ax3,othercolor('Purples9'))
 
 axis([200 330 15 80])
 
+end
 
 %% Make video
 
