@@ -21,7 +21,7 @@ topo_filled = (imfill(topo_cont)-topo_cont) .* ...
 
 % Find depressions that are adjacent to ice sheets
 ice_lake_overlap = sign(topo_filled) + sign(boundary_mat);
-CC = bwconncomp(ice_lake_overlap);
+CC = bwconncomp(ice_lake_overlap,4);
 
 % group patches by connectivity
 lake = zeros(size(oc_j));
