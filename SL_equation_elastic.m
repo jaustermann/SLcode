@@ -9,7 +9,7 @@
 
 %% Parameters & Input 
 % Specify maximum degree to which spherical transformations should be done
-maxdeg = 256;
+maxdeg = 128;
 
 % parameters
 rho_ice = 916;
