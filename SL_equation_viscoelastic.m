@@ -257,7 +257,7 @@ for topo_it = 1:topo_it_max;
             else
                 % if the floating ice check is set to 'n', don't change the
                 % ice model
-                 ice_corrected(:,:,i) = ice_j;
+                 ice_corrected(:,:,i) = ice(:,:,i);
             end
         end
 
