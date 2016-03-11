@@ -1,7 +1,7 @@
 function T_lm = get_tlm(maxdeg)
 
 a = 6371E3;
-M_e = 5.9742E24;
+M_e = 5.976E24;
 const = 4*pi*a^3/M_e;
 
 T_lm = [];

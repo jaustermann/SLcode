@@ -1,6 +1,6 @@
 function h_lm = love_lm(num, maxdegree)
 
-% no dc shift also fro gravity love number
+% no dc shift also for gravity love number
 h = [0 num'];
 
 h_lm = [];

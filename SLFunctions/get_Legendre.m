@@ -4,21 +4,19 @@ function [P_lm_spa2sph, P_lm_sph2spa] = get_Legendre(lat_in,maxdeg)
 % J. Austermann 2015
 
 % get latitude and colatitude
-lat = lat_in;
+% lat = lat_in;
 colat_inv = lat_in + 90;
 
 % make a legendre grid
-N = length(lat);
-[x,w] = GaussQuad(N);
+% N = length(lat);
+% [x,w] = GaussQuad(N);
 % The argument of Legendre polynomials (cos(x)) are quadrature points,
 % hence one has to calculate the respective latitude points
-x_gauss = acos(x)*180/pi;
+x_gauss = colat_inv; %acos(x)*180/pi;
 
-% initialize vectors
-P_lm_spa2sph = NaN * ones(length(x_gauss)*(maxdeg+1)*(maxdeg+2)/2,1);
-P_lm_sph2spa = NaN * ones(length(colat_inv)*(maxdeg+1)*(maxdeg+2)/2,1);
-ind_spa2sph = 1;
-ind_sph2spa = 1;
+% initialize matrices
+P_lm_sph2spa = zeros(length(lat_in),maxdeg+1,maxdeg+1);
+P_lm_spa2sph = zeros(maxdeg+1,length(lat_in),maxdeg+1); 
 
 for n = 0:maxdeg
     % compute Legendre polynomials
@@ -29,11 +27,8 @@ for n = 0:maxdeg
 
     % write them int a vector
     for m = 0:n
-        P_lm_spa2sph(ind_spa2sph : ind_spa2sph+length(x_gauss)-1) = P_lm_spa2sph_n(m+1,:);
-        P_lm_sph2spa(ind_sph2spa : ind_sph2spa+length(colat_inv)-1) = P_lm_sph2spa_n(m+1,:);
-        
-        ind_spa2sph = ind_spa2sph + length(x_gauss);
-        ind_sph2spa = ind_sph2spa + length(colat_inv);
+        P_lm_sph2spa(1:length(lat_in),m+1,n+1) = P_lm_sph2spa_n(m+1,:)';
+        P_lm_spa2sph(m+1,1:length(lat_in),n+1) = P_lm_spa2sph_n(m+1,:);
     end
     
 end
