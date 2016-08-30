@@ -1,7 +1,7 @@
 % Code to solve the elastic sea level equation following 
 % Kendall et al., 2005 and Austermann et al., 2015
 
-% J. Austermann 2015
+% J. Austermann 2016
 
 % add paths when run for the first time.
 % addpath SLFunctions
@@ -92,8 +92,6 @@ g = 9.80665;
 % % interpolate topography grid onto Gauss Legendre Grid
 % topo_pres = interp2(lon_topo,lat_topo,topo_bed,lon_out, lat_out) + ice(:,:,end);
 
-
-
 load benchmark_in_out/ice5g_gl
 
 % ice = cell(size(times));
@@ -128,7 +126,6 @@ P_lm = cell(N+1,1);
 for l=0:N
     P_lm{l+1} = legendre(l,x,'norm');
 end
-%del_ice = ice_j - ice_0; 
 
 
 % --------------------------------
@@ -159,10 +156,7 @@ topo_pres = topobr + ice(:,:,end);
 % to calculate the fluid case, switch h_el to h_fl, k_el to k_fl and same
 % for tidal love numbers
 
-% to compare with sam:
-% load SavedLN/VM2_tp
 load SavedLN/prem.l90C.umVM2.lmVM2.mat
-% load SavedLN/VM2_sam.mat
 h_lm = love_lm(h_el, maxdeg);
 k_lm = love_lm(k_el, maxdeg);
 h_lm_tide = love_lm(h_el_tide,maxdeg);
@@ -174,7 +168,7 @@ T_lm = get_tlm(maxdeg);
 E_lm_T = 1 + k_lm_tide - h_lm_tide;
 
 
-% calculate time betas
+% calculate betas
 beta_l = cell(length(ice_time_new)-1,1);
 beta_konly_l = cell(length(ice_time_new)-1,1);
 
@@ -192,7 +186,7 @@ for t_it = 2:length(ice_time_new)
         
         beta_l{t_it-1}(n-1,:) = [0; beta]; % add 0 LN
 
-        % only needed for degree 2
+        % for rotation only needed for degree 2
         lm = 2;
         num_mod = mode_found(lm);
         beta_konly_l{t_it-1}(n-1) = sum((k_amp(lm,1:num_mod)) ...
@@ -202,6 +196,8 @@ for t_it = 2:length(ice_time_new)
     end
 end
 
+
+% calculate tidal betas
 
 beta_tide = cell(length(ice_time_new)-1,1);
 beta_konly_tide = cell(length(ice_time_new)-1,1);
@@ -221,7 +217,7 @@ for t_it = 2:length(ice_time_new)
         
         beta_tide{t_it-1}(n-1,:) = [0; beta]; % add 0 LN
         
-        % only needed for degree 2
+        % for rotation only needed for degree 2
         lm = 2;
         num_mod = mode_found(lm);
         beta_konly_tide{t_it-1}(n-1) = sum((k_amp_tide(lm,1:num_mod)) ...
@@ -261,7 +257,6 @@ max_topo_diff = 0.1; % convergence criterion
 % initial topography guess: topography is the same as present at every
 % point in time; topography is a 3D vector; access topography at time x
 % like this topo(:,:,x) [or for plotting squeeze(topo(:,:,x))]
-% topo = repmat(topo_pres,[1,1,length(ice_time_new)]);
 
 % set up initial topography and ocean function
 topo_initial = zeros(length(x_GL),length(lon_GL),topo_it_max+1);
@@ -274,7 +269,6 @@ topo = zeros(length(x_GL),length(lon_GL),length(ice_time_new));
 for i = 2:length(ice_time_new)
     topo(:,:,i) = topo_pres - ice(:,:,end) + ice(:,:,i);
 end
-% topo = repmat(topo_pres,[1,1,length(ice_time_new)]);
 
 
 % initialize 
@@ -444,7 +438,7 @@ for topo_it = 1:topo_it_max;
                         if t_it == 2
                             V_lm_T = zeros(size(T_lm));
                         else
-                            for lm_it = 1:6 % don't need to loop over all degrees / length(h_lm)
+                            for lm_it = 1:6 % don't need to loop over all degrees 
                                 V_lm_T(lm_it) = beta_tide{t_it-1}(:,beta_counter(lm_it))'...
                                     * sdelLa_lm(1:t_it-2,lm_it);
                             end
