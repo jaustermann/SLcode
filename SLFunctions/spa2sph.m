@@ -13,7 +13,7 @@ N = length(colat);
 % The argument of Legendre polynomials (cos(x)) are quadrature points,
 % hence one has to calculate the respective latitude points
 %x_gauss = acos(x)*180/pi;
-x_gauss = 180-colat;
+% x_gauss = 180-colat;
 
 % % check if you already are on a gauss legendre grid
 % if sum(abs(x_gauss - colat)) < 0.1
@@ -49,7 +49,7 @@ if nargin == 4
     ind_a = 1;
     for n = 0:maxdegree
         % Get legendre polynomial
-        P_lm(1:n+1,1:N) = legendre_me(n,cos(x_gauss*pi/180),'me');
+        P_lm(1:n+1,1:N) = sqrt(2)*legendre_me(n,cos(colat*pi/180),'norm');
 
         % Do quadrature
         a_lm(ind_a:ind_a+n) = 1/(4*pi) * w*(P_lm'.*g_m(:,1:n+1));

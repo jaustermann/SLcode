@@ -5,16 +5,15 @@
 
 % add paths when run for the first time.
 % addpath SLFunctions
-% addpath SLFunctions/mtimesx
 % addpath '/Users/jackyaustermann/Documents/MATLAB/m_map'
 
 %% Parameters & Input 
 % Specify maximum degree to which spherical transformations should be done
-maxdeg = 128;
+maxdeg = 256;
 
 % Some options to choose from
 include_lakes = 'n'; % choose between y (for yes) and n (for no)
-include_rotation = 'n'; % choose between y (for yes) and n (for no)
+include_rotation = 'y'; % choose between y (for yes) and n (for no)
 include_ice_check = 'y'; % choose between y (for yes) and n (for no)
 include_100year_timestep = 'n'; % choose between y (for yes) and n (for no)
 
@@ -125,12 +124,10 @@ lon = lon_GL;
 [lon_out,lat_out] = meshgrid(lon_GL,x_GL);
 
 % Precompute legendre polynomials
-[P_lm_spa2sph, P_lm_sph2spa] = get_Legendre(x_GL,maxdeg);
-
-P_lm_spa2sph = single(P_lm_spa2sph);
-P_lm_sph2spa = single(P_lm_sph2spa);
-    
-
+P_lm = cell(N+1,1);
+for l=0:N
+    P_lm{l+1} = legendre(l,x,'norm');
+end
 %del_ice = ice_j - ice_0; 
 
 
@@ -161,8 +158,11 @@ topo_pres = topobr + ice(:,:,end);
 % prepare love numbers in suitable format and calculate T_lm and E_lm 
 % to calculate the fluid case, switch h_el to h_fl, k_el to k_fl and same
 % for tidal love numbers
+
+% to compare with sam:
+% load SavedLN/VM2_tp
 load SavedLN/prem.l90C.umVM2.lmVM2.mat
-% load SavedLN/prem.l21C.ump1.lmVM2.mat
+% load SavedLN/VM2_sam.mat
 h_lm = love_lm(h_el, maxdeg);
 k_lm = love_lm(k_el, maxdeg);
 h_lm_tide = love_lm(h_el_tide,maxdeg);
@@ -175,9 +175,8 @@ E_lm_T = 1 + k_lm_tide - h_lm_tide;
 
 
 % calculate time betas
-beta_l = cell(length(ice_time_new)-1);
-%beta_lm = cell(length(ice_time_new)-1);
-% beta_lm = zeros(length(ice_time_new)-1,length(ice_time_new)-1,length(h_lm));
+beta_l = cell(length(ice_time_new)-1,1);
+beta_konly_l = cell(length(ice_time_new)-1,1);
 
 for t_it = 2:length(ice_time_new)
     
@@ -192,7 +191,42 @@ for t_it = 2:length(ice_time_new)
         end
         
         beta_l{t_it-1}(n-1,:) = [0; beta]; % add 0 LN
-        % beta_lm{t_it-1}(n-1,:) = single(love_lm(beta, maxdeg));
+
+        % only needed for degree 2
+        lm = 2;
+        num_mod = mode_found(lm);
+        beta_konly_l{t_it-1}(n-1) = sum((k_amp(lm,1:num_mod)) ...
+                ./spoles(lm,1:num_mod).* (1 - exp(- spoles(lm,1:num_mod) ...
+                * (-ice_time_new(t_it) + ice_time_new(n)))));
+
+    end
+end
+
+
+beta_tide = cell(length(ice_time_new)-1,1);
+beta_konly_tide = cell(length(ice_time_new)-1,1);
+
+for t_it = 2:length(ice_time_new)
+    
+    for n = 2:t_it-1
+        
+        beta = zeros(maxdeg, 1);
+        for lm = 1:maxdeg
+            num_mod = mode_found(lm);
+            beta(lm) = sum((k_amp_tide(lm,1:num_mod) - h_amp_tide(lm,1:num_mod)) ...
+                ./spoles(lm,1:num_mod).* (1 - exp(- spoles(lm,1:num_mod) ...
+                * (-ice_time_new(t_it) + ice_time_new(n)))));
+            
+        end
+        
+        beta_tide{t_it-1}(n-1,:) = [0; beta]; % add 0 LN
+        
+        % only needed for degree 2
+        lm = 2;
+        num_mod = mode_found(lm);
+        beta_konly_tide{t_it-1}(n-1) = sum((k_amp_tide(lm,1:num_mod)) ...
+                ./spoles(lm,1:num_mod).* (1 - exp(- spoles(lm,1:num_mod) ...
+                * (-ice_time_new(t_it) + ice_time_new(n)))));
 
     end
 end
@@ -209,48 +243,14 @@ for lm_it = 1:length(h_lm)
     end
 end
 
-%%
-% calculate time betas
-% beta_T_lm = zeros(length(ice_time_new)-1,length(ice_time_new)-1,length(h_lm));
-% for t_it = 2:length(ice_time_new)
-%     for n = 2:t_it-1
-%         beta_T = zeros(maxdeg, 1);
-%         for lm = 1:maxdeg
-%             num_mod = mode_found(lm);
-%             beta_T(lm) = sum((k_amp_tide(lm,1:num_mod) - h_amp_tide(lm,1:num_mod)) ...
-%                 ./spoles(lm,1:num_mod).* (1 - exp(- spoles(lm,1:num_mod) ...
-%                 * (-ice_time_new(t_it) + ice_time_new(n)))));
-%         end
-%         beta_T_lm(t_it-1,n-1,:) = love_lm(beta_T, maxdeg);
-%     end
-% end
-% 
-% visc_k_L = zeros(length(ice_time_new)-1,length(ice_time_new)-1);
-% visc_k_T = zeros(length(ice_time_new)-1,length(ice_time_new)-1);
-% lm = 2;
-% 
-% for t_it = 2:length(ice_time_new)
-%     for n = 1:t_it-1
-%         num_mod = mode_found(lm);
-%         visc_k_L(t_it-1,n-1,:) = sum((k_amp(lm,1:num_mod)) ...
-%             ./spoles(lm,1:num_mod).* (1 - exp(- spoles(lm,1:num_mod) ...
-%             * (ice_time_new(t_it) - ice_time_new(n)))));
-%         visc_k_T(t_it-1,n-1,:)) = sum((k_amp_tide(lm,1:num_mod)) ...
-%             ./spoles(lm,1:num_mod).* (1 - exp(- spoles(lm,1:num_mod) ...
-%             * (ice_time_new(t_it) - ice_time_new(n)))));
-%     end
-% end
-% 
-% k_L = k_el(lm+1)+sum(visc_k_L,1);
-% k_T = k_el(lm+1)+sum(visc_k_T,1);
 
 %% Solve sea level equation (after Kendall 2005, Dalca 2013 & Austermann et al. 2015)
 tic
 k_max = 10;   % maximum number of iterations
-epsilon = 10^-4; % convergence criterion
+epsilon = 10^-4;%10^-4; % convergence criterion
 
-topo_it_max = 1;   % maximum number of iterations
-max_topo_diff = 0.00001; % convergence criterion
+topo_it_max = 4;   % maximum number of iterations %4 for to reproduce sam to 0.0xm
+max_topo_diff = 0.1; % convergence criterion
 
 % 0 = before
 % j = after
@@ -303,6 +303,9 @@ for topo_it = 1:topo_it_max;
         delLa_lm_prev = zeros(1,length(h_lm));
         deli_00_prev = 0;
         sdelL_lm = zeros(length(ice_time_new)-1,length(h_lm));
+        sdelLa_lm = zeros(length(ice_time_new)-1,length(h_lm));
+        sdelI = zeros(length(ice_time_new)-1,3);
+        sdelm = zeros(length(ice_time_new)-1,3);
 
         % update new initial topography
         topo(:,:,1) = topo_initial(:,:,topo_it);
@@ -321,8 +324,6 @@ for topo_it = 1:topo_it_max;
                  check1 = sign_01(-topo(:,:,i) + ice(:,:,i));
                  check2 = sign_01(+topo(:,:,i) - ice(:,:,i)) .* ...
                      (sign_01(-ice(:,:,i)*rho_ice - (topo(:,:,i) - ice(:,:,i))*rho_water));
-                     %(sign_01(ice(:,:,i)*rho_ice + (topo(:,:,i) - ice(:,:,i))*rho_water));
-                     %(sign_01(-topo(:,:,i)*rho_ice - (topo(:,:,i) - ice(:,:,i))*rho_water));
 
                  ice_corrected(:,:,i) = check1.*ice(:,:,i) + check2.*ice(:,:,i);
             else
@@ -340,7 +341,7 @@ for topo_it = 1:topo_it_max;
         % assign topography of time 0 and calculate ocean functions
         topo_0 = topo(:,:,1);
         oc_0 = sign_01(topo_0);
-        oc0_lm = spa2sph(oc_0,maxdeg,lon,colat,P_lm_spa2sph,w);
+        oc0_lm = sphere_har(oc_0,maxdeg,N,P_lm);
         ocj_lm_prev = oc0_lm;
         
 
@@ -351,11 +352,11 @@ for topo_it = 1:topo_it_max;
             % index j
             topo_j = topo(:,:,t_it);
             oc_j = sign_01(topo_j);
-            ocj_lm = spa2sph(oc_j,maxdeg,lon,colat,P_lm_spa2sph,w);
+            ocj_lm = sphere_har(oc_j,maxdeg,N,P_lm); 
 
             % calculate topography correction
             TO = topo_0.*(oc_j-oc_0);
-            TO_lm = spa2sph(TO,maxdeg,lon,colat,P_lm_spa2sph,w);
+            TO_lm = sphere_har(TO,maxdeg,N,P_lm);
 
             % calculate change in sediments and decompose into spherical harmonics
             % set to zero as is but can be set as the change between the sed load. 
@@ -367,7 +368,7 @@ for topo_it = 1:topo_it_max;
 
             % calculate the change in ice model
             del_ice_corrected = ice_corrected(:,:,t_it) - ice_corrected(:,:,1);
-            deli_lm = spa2sph(del_ice_corrected,maxdeg,lon,colat,P_lm_spa2sph,w);
+            deli_lm = sphere_har(del_ice_corrected,maxdeg,N,P_lm);
             % calculate the incremental increase in ice volume
             sdeli_00 = deli_lm(1) - deli_00_prev;
 
@@ -376,7 +377,7 @@ for topo_it = 1:topo_it_max;
             if include_lakes == 'y'
                 % determine the depression adjacent to ice sheets;
                 delP_j = calc_lake(ice_j_corr,oc_j,topo_j,lat_out,lon_out);
-                delP_lm = spa2sph(delP_j,maxdeg,lon,colat,P_lm_spa2sph,w);
+                delP_lm = sphere_har(delP_j,maxdeg,N,P_lm); 
             else
                 delP_lm = zeros(size(deli_lm));
             end
@@ -416,14 +417,7 @@ for topo_it = 1:topo_it_max;
                     % relative to last time step
                     sdelL_lm(t_it-1,:) = delL_lm - delL_lm_prev;
 
-                    % include rotation
-                    % calculate degree two tidal k love number
-
-    %                     % calculate contribution from rotation
-    %                     delLa_lm = calc_rot(delL_lm{t_it},k_L,k_T);
-    %                     sdelLa_lm = delLa_lm - delLa_lm_prev;
-
-
+                    
                     % calculate viscous contribution
 
                     % beta contains the viscous love numbers for time t_it,
@@ -436,39 +430,48 @@ for topo_it = 1:topo_it_max;
                             V_lm(lm_it) = beta_l{t_it-1}(:,beta_counter(lm_it))'...
                                 * sdelL_lm(1:t_it-2,lm_it);
                         end
-    %                         visc = beta_lm{t_it-1} .* sdelL_lm(1:t_it-2,:); 
-    %                         % sum over all time increments. 
-    %                         V_lm = sum(visc,1);
                     end
 
 
-    %                     % viscous rotation
-    %                     visc_T = squeeze(beta_T_lm(t_it-1,:,:)) .* sdelLa_lm; 
-    %                     % sum over all time increments.
-    %                     V_lm_T = sum(visc_T,1);
-
-
-                    % calculate sea level perturbation
-                    % add ice and sea level and multiply with love numbers
-                    % DT doesn't load!
+                    % calculate contribution from rotation
                     if include_rotation == 'y'
+                        [delLa_lm, sdelI, sdelm] = calc_rot_visc(delL_lm,...
+                            k_el(2),k_el_tide(2),t_it,...
+                            beta_konly_l, beta_konly_tide,...
+                            sdelI, sdelm);
+                        sdelLa_lm(t_it-1,:) = delLa_lm - delLa_lm_prev;
+                        
+                        if t_it == 2
+                            V_lm_T = zeros(size(T_lm));
+                        else
+                            for lm_it = 1:6 % don't need to loop over all degrees / length(h_lm)
+                                V_lm_T(lm_it) = beta_tide{t_it-1}(:,beta_counter(lm_it))'...
+                                    * sdelLa_lm(1:t_it-2,lm_it);
+                            end
+                        end   
+                        
+                        % calculate sea level perturbation
+                        % add ice and sea level and multiply with love numbers
+                        % DT doesn't load!
                         delSLcurl_lm_fl = E_lm .* T_lm .* delL_lm + T_lm .* V_lm + ...
-                            1/g*E_lm_T.*delLa_lm + 1/g*V_lm_T + ...
-                            T_lm .* V_lm;
+                           1/g*E_lm_T.*delLa_lm + 1/g*V_lm_T;
+                    
+                    % if don't include rotation 
                     else
                         delSLcurl_lm_fl = E_lm .* T_lm .* delL_lm + ...
                             T_lm .* V_lm;
                     end
+                    
 
                     % convert to spherical harmonics and subtract terms that are part
                     % of the topography to get the 'pure' sea level change
-                    delSLcurl_fl = sph2spa(delSLcurl_lm_fl,maxdeg,lon,colat,P_lm_sph2spa);
+                    delSLcurl_fl = inv_sphere_har(delSLcurl_lm_fl,maxdeg,N,P_lm);
                     delSLcurl = delSLcurl_fl - del_ice_corrected - del_DT - del_sed;
 
 
                     % compute and decompose RO
                     RO = delSLcurl.*oc_j;
-                    RO_lm = spa2sph(RO,maxdeg,lon,colat,P_lm_spa2sph,w);
+                    RO_lm = sphere_har(RO,maxdeg,N,P_lm);
 
                     % calculate eustatic sea level perturbation (delta Phi / g)
                     delPhi_g = 1/ocj_lm(1) * (- rho_ice/rho_water*deli_lm(1) ...
@@ -512,8 +515,11 @@ for topo_it = 1:topo_it_max;
             delS_lm_prev = delS_lm;
             TO_lm_prev = TO_lm;
             delL_lm_prev = delL_lm;
-    %            delLa_lm_prev = delLa_lm;
             deli_00_prev = deli_lm(1);
+            
+            if include_rotation == 'y'
+                delLa_lm_prev = delLa_lm;
+            end
 
             % calculate overall perturbation of sea level over oceans
             % (spatially varying field and constant offset)
@@ -559,15 +565,21 @@ for i = 1:length(ice_time_new)
 end
 toc
 
+SL = zeros(size(topo));
+for i = 1:length(ice_time_new)
+    SL(:,:,i) = (topo(:,:,1) - ice_corrected(:,:,1)) - ...
+        (topo(:,:,i) - ice_corrected(:,:,i));
+end
+
 
 %% Plot results
 
 % We only want the sea level change cause by melted ice, so subtract
 % del_ice
-fig_time = 118;
+fig_time = 20;
 ind = find(ice_time_new==fig_time);
 
-plotSL = squeeze(RSL(:,:,ind) - RSL_new(:,:,ind));
+plotSL = squeeze(RSL(:,:,ind));
 
 % plot
 figure
@@ -584,10 +596,11 @@ colormap(jet)
 
 % load benchmark_in_out/ICE5G_VM2_noTPW_floating.mat
 % load benchmark_in_out/ICE5G_VM2_noTPW_nofloating.mat
+load benchmark_in_out/ICE5G_VM2.mat
 % load ice5g_gl
-plot_time = 118;
+fig_time = 20;
 
-plotSL = squeeze(sl(:,:,times == plot_time) - sl(:,:,1));
+plotSL = squeeze(sl(:,:,ice_time_new == fig_time));
 
 % N = 256;
 % [x,w] = GaussQuad(N);
@@ -612,8 +625,8 @@ colormap(jet)
 
 % We only want the sea level change cause by melted ice, so subtract
 % del_ice
-fig_time = 21;
-plotSL_JA = squeeze(RSL(:,:,ice_time_new==fig_time));
+fig_time = 20;
+plotSL_JA = squeeze(RSL(:,:,ice_time_new == fig_time));
 plotSL_SG = squeeze(sl(:,:,ice_time_new == fig_time));
 
 plotSL = plotSL_JA - plotSL_SG;

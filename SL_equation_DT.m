@@ -35,7 +35,6 @@ lon_GL = lon_GL(1:end-1);
 
 colat = 90 - x_GL;
 lon = lon_GL;
-colat_inv = 180 - colat';
 
 [lon_out,lat_out] = meshgrid(lon_GL,x_GL);
 
@@ -47,7 +46,7 @@ colat_inv = 180 - colat';
 % load Love numbers
 % prepare love numbers in suitable format and calculate T_lm and E_lm 
 % load ReadSaveLN/LN_l70_ump5_lm5
-load SavedLN/LN_l90_VM2
+load SavedLN/prem.l90C.umVM2.lmVM2.mat
 h_lm = love_lm(h_fl, maxdeg);
 k_lm = love_lm(k_fl, maxdeg);
 h_lm_tide = love_lm(h_fl_tide,maxdeg);
@@ -67,7 +66,7 @@ E_lm_T = 1 + k_lm_tide - h_lm_tide;
 % to use - delS etc. 
 
 k_max = 10;         % maximum number of iterations
-epsilon = 0.001;    % convergence criterion
+epsilon = 1e-4;    % convergence criterion
 
 
 % set up present-day topo and ocean function (based on 3 Myr topo)
@@ -80,10 +79,10 @@ oc_j = sign_01(topo_j);
 
 
 % Decompose change in sediments into spherical harmonics
-Sed_lm = spa2sph(del_S,maxdeg,lon,colat_inv);
+Sed_lm = spa2sph(del_S,maxdeg,lon,colat);
 
 % Expands grav_MC function into spherical harmonics
-G_lm = spa2sph(del_G,maxdeg,lon,colat_inv);
+G_lm = spa2sph(del_G,maxdeg,lon,colat);
 
 %ice_j_corr = check1.*ice_j + check2.*ice_j;
 %delIce = ice_j_corr - ice_0;
@@ -91,7 +90,7 @@ G_lm = spa2sph(del_G,maxdeg,lon,colat_inv);
 delIce = del_I;
 
 % Decompose change in ice
-i_lm = spa2sph(delIce,maxdeg,lon,colat_inv);
+i_lm = spa2sph(delIce,maxdeg,lon,colat);
 
 % Initial values for convergence
 conv = 'not converged yet';
@@ -105,7 +104,7 @@ for k = 1:k_max % loop for sea level and topography iteration
         case 'not converged yet'
 
         % Expand ocean function into spherical harmonics
-        ocj_lm = spa2sph(oc_j,maxdeg,lon,colat_inv);
+        ocj_lm = spa2sph(oc_j,maxdeg,lon,colat);
 
         % Check ice model for floating ice
         %check1 = sign_01(-topo_j + ice_j);
@@ -123,14 +122,14 @@ for k = 1:k_max % loop for sea level and topography iteration
         % Calculate topography correction for this step
         topo_corr_j = topo_0.*(oc_j-oc_0);
         % Expand topo function into spherical harmonics
-        TO_lm = spa2sph(topo_corr_j,maxdeg,lon,colat_inv);
+        TO_lm = spa2sph(topo_corr_j,maxdeg,lon,colat);
 
 
         if k == 1
             % Initial guess for change in sea surface height
             delSLcurl = topo_0 - topo_j; %= del_G - (del_H+del_I+del_DT)
             RO = delSLcurl.*oc_j;
-            RO_lm = spa2sph(RO,maxdeg,lon,colat_inv);
+            RO_lm = spa2sph(RO,maxdeg,lon,colat);
             
             delPhi_g = 1/ocj_lm(1) * (- rho_ice/rho_water*i_lm(1) ...
             - RO_lm(1) + TO_lm(1));
@@ -149,12 +148,12 @@ for k = 1:k_max % loop for sea level and topography iteration
         delSLcurl_lm_fl = E_lm .* T_lm .* ...
             (rho_ice*i_lm + rho_water*delS_lm + rho_sed*Sed_lm) + ...
             1/g*E_lm_T.*La_lm + G_lm;
-        delSLcurl_fl = sph2spa(delSLcurl_lm_fl,maxdeg,lon,colat_inv);
+        delSLcurl_fl = sph2spa(delSLcurl_lm_fl,maxdeg,lon,colat);
         delSLcurl = delSLcurl_fl - del_I - del_DT - del_S;
 
         % Compute and decompose RO
         RO = delSLcurl.*oc_j;
-        RO_lm = spa2sph(RO,maxdeg,lon,colat_inv);
+        RO_lm = spa2sph(RO,maxdeg,lon,colat);
 
         % Compute delta Phi / g
         delPhi_g = 1/ocj_lm(1) * (- rho_ice/rho_water*i_lm(1) ...
@@ -171,7 +170,7 @@ for k = 1:k_max % loop for sea level and topography iteration
 
         %compute and decompose ocean height
         delS_new = delSL.*oc_j -  topo_0.*(oc_j-oc_0);
-        delS_lm_new = spa2sph(delS_new,maxdeg,lon,colat_inv);
+        delS_lm_new = spa2sph(delS_new,maxdeg,lon,colat);
 
         % check convergence
         chi = abs( (sum(abs(delS_lm_new)) - sum(abs(delS_lm))) / ...

@@ -9,7 +9,7 @@
 
 %% Parameters & Input 
 % Specify maximum degree to which spherical transformations should be done
-maxdeg = 128;
+maxdeg = 512;
 
 % parameters
 rho_ice = 916;
@@ -32,7 +32,10 @@ lon = lon_GL;
 [lon_out,lat_out] = meshgrid(lon_GL,x_GL);
 
 % Precompute legendre polynomials
-[P_lm_spa2sph, P_lm_sph2spa] = get_Legendre(x_GL,maxdeg);
+P_lm = cell(N+1,1);
+for l=0:N
+    P_lm{l+1} = legendre(l,x,'norm');
+end
 
 
 % --------------------------------
@@ -113,10 +116,10 @@ topo_j = topo_0 + del_ice; % del_ice is negative -> subtract ice that is melted
 oc_j = sign_01(topo_j);
 
 % calculate change in sediments and decompose into spherical harmonics
-Sed_lm = spa2sph(del_sed,maxdeg,lon,colat,P_lm_spa2sph);
+Sed_lm = sphere_har(del_sed,maxdeg,N,P_lm); 
 
 % expand ocean function into spherical harmonics
-oc0_lm = spa2sph(oc_0,maxdeg,lon,colat,P_lm_spa2sph);
+oc0_lm = sphere_har(oc_0,maxdeg,N,P_lm); 
 
 
 % initial values for convergence
@@ -132,24 +135,25 @@ for k = 1:k_max % loop for sea level and topography iteration
         case 'not converged yet'
             
         % expand ocean function into spherical harmonics
-        ocj_lm = spa2sph(oc_j,maxdeg,lon,colat,P_lm_spa2sph);
-
+        ocj_lm = sphere_har(oc_j,maxdeg,N,P_lm);  
+        
         % CHECK ICE MODEL 
         % check ice model for floating ice
-        check1 = sign_01(-topo_j + ice_j);
-        check2 = sign_01(+topo_j - ice_j) .* ...
-         (sign_01(-ice_j*rho_ice - (topo_j - ice_j)*rho_water));
+%         check1 = sign_01(-topo_j + ice_j);
+%         check2 = sign_01(+topo_j - ice_j) .* ...
+%          (sign_01(-ice_j*rho_ice - (topo_j - ice_j)*rho_water));
+%         
+%         ice_j_corr = check1.*ice_j + check2.*ice_j;
+%         del_ice_corrected = ice_j_corr - ice_0; 
+        del_ice_corrected = ice_j - ice_0; 
         
-        ice_j_corr = check1.*ice_j + check2.*ice_j;
-        del_ice_corrected = ice_j_corr - ice_0; 
+        deli_lm = sphere_har(del_ice_corrected,maxdeg,N,P_lm);  
         
-        deli_lm = spa2sph(del_ice_corrected,maxdeg,lon,colat,P_lm_spa2sph);
-
         
         % calculate topography correction
         TO = topo_0.*(oc_j-oc_0);
         % expand TO function into spherical harmonics
-        TO_lm = spa2sph(TO,maxdeg,lon,colat,P_lm_spa2sph);
+        TO_lm = sphere_har(TO,maxdeg,N,P_lm); 
         
         
         % set up initial guess for sea level change
@@ -159,7 +163,7 @@ for k = 1:k_max % loop for sea level and topography iteration
             delS_lm = ocj_lm/ocj_lm(1)*(-rho_ice/rho_water*deli_lm(1) + ...
                 TO_lm(1));
             % convert into spherical harmonics
-            delS_init = sph2spa(delS_lm,maxdeg,lon,colat,P_lm_sph2spa);
+            % delS_init = inv_sphere_har(delS_lm,maxdeg,N,P_lm);
             
         end
         

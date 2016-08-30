@@ -14,7 +14,7 @@ spa_matrix = single(zeros(length(colat),length(lon)));
 % harmonic
 % Need to use '-' to get the longitude right. 
 m_vec = single(0:maxdegree);
-exp_func_all = single(exp(-1i*m_vec'*lon*pi/180));
+exp_func_all = single(exp(1i*m_vec'*lon*pi/180));
 
 
 % check whether the Legendre Polynomials have been precomputed
@@ -25,11 +25,11 @@ if nargin == 4
     % loop over all degrees
     for n = 0:maxdegree
         % get associated legendre polynomial in normalized form
-        P_lm = legendre_me(n,cos((180-colat)'*pi/180),'me');
+        P_lm = sqrt(2)*legendre_me(n,cos(colat'*pi/180),'norm');
 
         % get coefficients corresponding to degree n from coefficient vector
         a_l = get_coeffs(a_lm,n);
-        a_l_rep = repmat(a_l',1,length(lon));
+        a_l_rep = repmat(a_l.',1,length(lon));
 
         % add / sum all orders from m = 0 to m = n to spatial matrix
         % m = 0
@@ -51,7 +51,7 @@ else
 
         % get coefficients corresponding to degree n from coefficient vector
         a_l = single(get_coeffs(a_lm,n));
-        a_l_rep = repmat(a_l',1,length(lon));
+        a_l_rep = repmat(a_l.',1,length(lon));
 
         % add / sum all orders from m = 0 to m = n to spatial matrix
         % m = 0
