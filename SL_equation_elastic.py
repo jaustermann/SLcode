@@ -6,6 +6,11 @@ import pyspharm
 from scipy import io
 from scipy import interpolate
 from matplotlib import pyplot as plt
+import time
+plt.ion()
+
+#from spharm import Spharmt, getspecindx # try to use standard library
+
 
 # Code to solve the elastic sea level equation following 
 # Kendall et al., 2005 and Austermann et al., 2015
@@ -21,7 +26,7 @@ from matplotlib import pyplot as plt
 # e.g., func(maxdeg, rho_ice=916.7, rho_water=1000., rho_sed=2300., g=9.81)
 
 # Specify maximum degree to which spherical transformations should be done
-maxdeg = 128 # N
+maxdeg = 256 # N
 
 # parameters
 rho_ice = 916.7
@@ -34,26 +39,33 @@ g = 9.80616
 
 # And with bindings
 # grid, time step info
-nlons = maxdeg * 2  # number of longitudes
-ntrunc = maxdeg - 1
-nlats = maxdeg # for gaussian grid.
+# WHY IS IT HAVING MAXIMUM DEGREE ISSUE?
+# HAD MAXDEG-1 BEFORE...
+nlons = (maxdeg + 2) * 2 #+ 1  # number of longitudes
+ntrunc = maxdeg
+nlats = (maxdeg + 2) # for gaussian grid.
 a = rsphere = 6.37122e6 # earth radius
 
 # setup up spherical harmonic instance, set lats/lons of grid
-sh = pyspharm.Spharmt(nlons,nlats,ntrunc,rsphere,gridtype='gaussian')
+# "gaussian" = a Gauss-Legendre grid; no need
+# to do quadrature by self
+sh = pyspharm.Spharmt(nlons, nlats, ntrunc, rsphere, gridtype='gaussian')
+#sh = Spharmt(nlons,nlats,legfunc='computed') # try to use standard library
 # Check if needed
 elons  = sh.lons * 180 / np.pi
 lats   = sh.lats * 180 / np.pi
 colats = 90 - lats
-lon_out, lat_out = np.meshgrid(elons, colats)
+#lon_out, lat_out = np.meshgrid(elons, colats)
 
+# See Mitrovica et al. (2005)
+# and Milne and Mitrovica (1998)
 
 # Variables needed later
-M_e = 5.9742E24
+M_e = 5.9742E24 # Earth mass [kg]
 # for calc_rot
-omega = 7.292E-5
-k_hydro = 0.934
-CminA = 2.6E35
+omega = 7.292E-5 # Earth's angular velocity
+k_hydro = 0.934 # degree-2 hydrostatic Love number
+CminA = 2.6E35 # a, c = smallest and largest principal moments of the inertia tensor
 sqrt_32_15 = (32/15.)**0.5
 
 
@@ -82,9 +94,21 @@ ice_j = f(elons, lats[::-1])[::-1]
 
 del_ice = ice_j - ice_0
 
+# Change the ice grid
+#del_ice *= 0
+#del_ice[30:60,30:60] = 1
+#del_ice[30:40,60:90] = 1.
+#del_ice[:] = 1.
+#ice_j = del_ice.copy()
+
+
 #ice_0[20:90,20:90] += 4E3
 #ice_0[:,:] = 10E3
 
+
+# EXTERNAL LOADS, incl. PLACEHOLDERS
+# CLEAN TO BASE ON LAT,LON -- CLEANER IF I USE
+# A DIFFERENT INPUT!
 
 # --------------------------------
 # DYNAMIC TOPOGRAPHY
@@ -104,7 +128,10 @@ del_sed = np.zeros(del_ice.shape)
 # TOPOGRAPHY
 # --------------------------------
 
-# load preloaded etopo (including ice) as topo_orig, lon_topo, lat_topo
+# load preloaded topo (including ice) as topo_orig, lon_topo, lat_topo
+# FOR UPDATE! WANT EXCLUDING ICE: GET ETOPO1 "BEDROCK" <----- !!!!!!!!!!!!!!!!!!!!!!!!!!!
+# lOOK AT JACKY'S NEW CODE LINES 57-69 FOR PRE-INTERPOLATED MAPS!
+# AVOID INTERPOLATION ERRORS (PROBABLY DOESN'T MATTER, BUT DO IT CORRECTLY ANYWAY!)
 topo = io.loadmat('gebco_08_15am')
 topo_nlats, topo_nlons = topo['map_data'].shape
 topo_colats = np.linspace(180./topo_nlats/2., 180 - 180./topo_nlats/2., topo_nlats)
@@ -123,31 +150,46 @@ def love_lm(num, group='l'):
   """
   h = np.hstack(( 0, num.squeeze() ))
   h_lm = [];
+  print group
   if group == 'l':
     # This is the standard for Jerry's code
     for l in range(maxdeg+1):
-      h_lm += ([h[l]] * l)
+      h_lm += ([h[l]] * (l + 1))
   elif group == 'm':
     # This works with the spherical harmonic library I am using here
     for m in range(maxdeg):
       h_lm += (list(h[:m+1]))
+    # Although an analagous expression to Jerry's produces a plot that is more
+    # like his...
+    #for m in range(maxdeg+1):
+    #  h_lm += ([h[m]] * m)
   h_lm = np.array(h_lm)
   return h_lm
 
 # prepare love numbers in suitable format and calculate T_lm and E_lm 
 # to calculate the fluid case, switch h_el to h_fl, k_el to k_fl and same
 # for tidal love numbers
+# Has 256 values -- so can use resolution
+# up to degree 256
+# 1 value per degree -- but not per degree and order!
+# k is gravity field deformation Love number (G)
+# h is the solid Earth deformation Love number (R)
+# Sea level = G-R
 love = io.loadmat('SavedLN/LN_l90_VM2')
 h_lm = love_lm(love['h_el'])
 k_lm = love_lm(love['k_el'])
 h_lm_tide = love_lm(love['h_el_tide'])
 k_lm_tide = love_lm(love['k_el_tide'])
 
-E_lm = 1 + k_lm - h_lm
+E_lm = 1 + k_lm - h_lm # 1 + G - R
+                       # 1 is for self-gravity of the ice sheet itself
 # Need to have proper size for the in/out grid size; set higher-order values
 # to 0
 #E_lm = np.hstack(( E_lm, np.zeros(len(oc0_lm) - len(E_lm)) )) * 0
 
+# Can have deg 0 term because multiplied w/ 
+# E_l and beta_l in viscous response cases,
+# both of which are 0 @ l=0,m=0
 def get_tlm(maxdeg, group='l'):
   T_lm = []
   T = np.zeros(maxdeg+1)
@@ -156,11 +198,11 @@ def get_tlm(maxdeg, group='l'):
     # This is the standard for Jerry's code
     for l in range(maxdeg+1):
       T[l] = const / (2 * l + 1.)
-      T_lm += ([T[l]] * l) # IMPORTANT
+      T_lm += ([T[l]] * (l + 1)) # IMPORTANT -- must have one entry per SH order
   elif group == 'm':
     # This works with the spherical harmonic library I am using here, I think
     for m in range(maxdeg):
-      T[m] = const / (2 * m + 1.)
+      T[m] = const / (2 * m)
       T_lm += (list(T[:m+1])) # IMPORTANT
   T_lm = np.array(T_lm)
   return T_lm
@@ -252,12 +294,47 @@ def calc_rot(L_lm, _k, _k_tide, group='l'):
 
   La_lm = np.zeros(L_lm.shape, dtype=np.complex128)
 
+  # NOTE! WILL HAVE TO CHANGE THIS if l,m are switched
+  # This is written for ordering by l first, and then m (in inner loop)
   La_lm[:6] += np.hstack((La00, 0, 0, La20, La21, La22))
 
   return La_lm
   
+# Define initial values so we don't exit while loop
+# right away
 k = 0
 chi = epsilon * 2
+
+def reorder_m_to_l_primary(ml):
+  # maxdeg + 1 b/c [0...maxdeg]
+  lm_grid = np.nan * np.zeros((maxdeg + 1, maxdeg + 1), dtype='complex')
+  j = 0
+  for i in range(maxdeg + 1):
+    lm_grid[i:, i] = ml[j:j+maxdeg+1-i]
+    j += maxdeg + 1 - i
+  lm = []
+  for row in lm_grid:
+    lm += list(row[np.isnan(row) == False])
+  lm = np.array(lm)
+  return lm
+
+def reorder_l_to_m_primary(lm):
+  # maxdeg + 1 b/c [0...maxdeg]
+  ml_grid = np.nan * np.zeros((maxdeg + 1, maxdeg + 1), dtype='complex')
+  j = 0
+  for i in range(maxdeg + 1):
+    ml_grid[i, :i+1] = lm[j:j+i+1]
+    j += i+1
+    #ml_grid[i, :maxdeg+1-i] = lm[j:j+maxdeg+1-i]
+    #j += maxdeg + 1 - i
+  ml_grid_transpose = ml_grid.transpose()
+  ml = []
+  for row in ml_grid_transpose:
+    ml += list(row[np.isnan(row) == False])
+  ml = np.array(ml)
+  return ml
+
+start_time = time.time()
 
 # Iterations k
 # Iteration criterion epsilon
@@ -266,7 +343,12 @@ while (k < k_max) and (chi >= epsilon):
   #print chi
 
   # expand ocean function into spherical harmonics
-  ocj_lm = sh.grdtospec(oc_j, norm='unity')
+  # in m-first ordering
+  #testgrid = 1 + oc_j*0
+  # NOTE! SLIGHTLY DIFFERENT FROM JACKY'S (0.5%)
+  # But b/c different topography (maybe???)
+  ocj_ml = sh.grdtospec(oc_j, norm='unity')
+  ocj_lm = reorder_m_to_l_primary(ocj_ml)
 
   # CHECK ICE MODEL 
   # check ice model for floating ice
@@ -274,15 +356,23 @@ while (k < k_max) and (chi >= epsilon):
   check2 = sign_01(+topo_j - ice_j) * \
     (sign_01(-ice_j*rho_ice - (topo_j - ice_j)*rho_water))
   
-  ice_j_corr = check1 * ice_j + check2 * ice_j
-  del_ice_corrected = ice_j_corr - ice_0
+  # Applying the floating ice correction
+  # ADD EVENTUALLY!
+  #ice_j_corr = check1 * ice_j + check2 * ice_j
+  #del_ice_corrected = ice_j_corr - ice_0
+  del_ice_corrected = ice_j - ice_0
   
-  deli_lm = sh.grdtospec(del_ice_corrected, norm='unity')
+  # In Jacky's, you can just compute to a particular
+  # degree instead of needing to always do it all!
+  deli_ml = sh.grdtospec(del_ice_corrected, norm='unity')
+  deli_lm = reorder_m_to_l_primary(deli_ml)
   
   # calculate topography correction
+  # shoreline migration
   TO = topo_0 * (oc_j-oc_0)
   # expand TO function into spherical harmonics
-  TO_lm = sh.grdtospec(TO, norm='unity')
+  TO_ml = sh.grdtospec(TO, norm='unity')
+  TO_lm = reorder_m_to_l_primary(TO_ml)
   
   # set up initial guess for sea level change
   if k == 0:
@@ -295,6 +385,7 @@ while (k < k_max) and (chi >= epsilon):
     #delS_init = sh.spectogrd(delS_lm, norm='unity')
       
   # calculate loading term
+  # ice, water, and sediment
   L_lm = rho_ice*deli_lm + rho_water*delS_lm + rho_sed*Sed_lm
 
   # calculate contribution from rotation
@@ -311,16 +402,19 @@ while (k < k_max) and (chi >= epsilon):
   # spatial resolution)
   delSLcurl_lm_fl = E_lm * T_lm * (rho_ice*deli_lm + rho_water*delS_lm \
                                    + rho_sed*Sed_lm) + 1./g*E_lm_T * La_lm
+  delSLcurl_ml_fl = reorder_l_to_m_primary(delSLcurl_lm_fl)
 
   # convert to spherical harmonics and subtract terms that are part
   # of the topography to get the 'pure' sea level change
-  delSLcurl_fl = sh.spectogrd( delSLcurl_lm_fl, norm='unity')
+  delSLcurl_fl = sh.spectogrd( delSLcurl_ml_fl, norm='unity')
+  #delSLcurl_fl = reorder_m_to_l_primary(delSLcurl_lf)
   delSLcurl = delSLcurl_fl - del_ice_corrected - del_DT - del_sed
 
 
   # compute and decompose RO
   RO = delSLcurl * oc_j
-  RO_lm = sh.grdtospec(RO, norm='unity')
+  RO_ml = sh.grdtospec(RO, norm='unity')
+  RO_lm = reorder_m_to_l_primary(RO_ml)
 
   # calculate eustatic sea level perturbation (delta Phi / g)
   delPhi_g = 1/ocj_lm[0] * (- rho_ice/rho_water*deli_lm[0] \
@@ -337,16 +431,17 @@ while (k < k_max) and (chi >= epsilon):
 
 
   # calculate change in ocean height and decompose
-  delS_new = delSL * oc_j -  topo_0 * (oc_j-oc_0)
-  delS_lm_new = sh.grdtospec(delS_new, norm='unity')
-
+  # (Just care about real parts now -- band-aid -- fix later!!!!!!!!!!!!!!!!!!!!!)
+  delS_new = np.real(delSL) * np.real(oc_j) -  topo_0 * (np.real(oc_j)-oc_0)
+  delS_ml_new = sh.grdtospec(delS_new, norm='unity')
+  delS_lm_new = reorder_m_to_l_primary(delS_ml_new)
 
   # calculate convergence criterion chi
   chi = np.abs( (np.sum(np.abs(delS_lm_new)) - np.sum(np.abs(delS_lm))) \
         / np.sum(np.abs(delS_lm)) )
         
   # update sea surface height
-  delS_lm = delS_lm_new
+  delS_lm = delS_lm_new.copy() # check if needed!!!!!!!
         
   k += 1
 
@@ -355,6 +450,10 @@ if chi < epsilon:
 else:
   print 'Did not yet converge.'
   print 'Finished iteration', k, '; Chi was', chi
+
+end_time = time.time()
+
+print "Time elapsed in k loop", end_time - start_time
 
 # calculate the scaling to normalize the fingerprint (it's normalized to be
 # one on average, when averaged over the final ocean basin). 
