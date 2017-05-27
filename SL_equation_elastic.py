@@ -1,13 +1,14 @@
 #! /usr/bin/env python
 
 import numpy as np
-import shtns # necessary? imported within pyspharm
+#import shtns # necessary? imported within pyspharm
 import pyspharm
 from scipy import io
 from scipy import interpolate
 from matplotlib import pyplot as plt
 import time
-plt.ion()
+
+plt.ion() # If you want interactive plotting
 
 #from spharm import Spharmt, getspecindx # try to use standard library
 
@@ -26,7 +27,9 @@ plt.ion()
 # e.g., func(maxdeg, rho_ice=916.7, rho_water=1000., rho_sed=2300., g=9.81)
 
 # Specify maximum degree to which spherical transformations should be done
+# Optimized to work at degree (2**n - 1), where n is a positive integer
 maxdeg = 64 # N
+iseven = (maxdeg % 2 == 0)
 
 # parameters
 rho_ice = 916.7
@@ -41,9 +44,9 @@ g = 9.80616
 # grid, time step info
 # WHY IS IT HAVING MAXIMUM DEGREE ISSUE?
 # HAD MAXDEG-1 BEFORE...
-nlons = (maxdeg + 2) * 2 #+ 1  # number of longitudes
+nlons = (maxdeg + 1 + iseven) * 2 #+ 1  # number of longitudes
 ntrunc = maxdeg
-nlats = (maxdeg + 2) # for gaussian grid.
+nlats = (maxdeg + 1 + iseven) # for gaussian grid.
 a = rsphere = 6.37122e6 # earth radius
 
 # setup up spherical harmonic instance, set lats/lons of grid
@@ -284,19 +287,19 @@ Sed_ml = sh.grdtospec(del_sed, norm='unity')
 # expand ocean function into spherical harmonics
 oc0_ml = sh.grdtospec(oc_0, norm='unity')
 
-def calc_rot(L_lm, _k, _k_tide, group='l'):
+def calc_rot(L_in, _k, _k_tide, group='l'):
 
   # extract degree 2:
   if group == 'l':
-    L20 = L_lm[3]
-    L21 = L_lm[4] 
-    L22 = L_lm[5]
+    L20 = L_in[3]
+    L21 = L_in[4] 
+    L22 = L_in[5]
     print L22
   elif group == 'm':
     print "WARN: hard-coded max l,m; will break!"
-    L20 = L_lm[ndeg]
-    L21 = L_lm[256+2]
-    L22 = L_lm[512]
+    L20 = L_in[2]
+    L21 = L_in[maxdeg+2]
+    L22 = L_in[2*maxdeg + 1]
     print L22
   k_L = _k[1] # This has 256 values
   k_T = _k_tide[1] # This has 256 values
@@ -325,13 +328,19 @@ def calc_rot(L_lm, _k, _k_tide, group='l'):
   La2m1 = -1 * np.conj(La21)
   La2m2 = 1 * np.conj(La22)
 
-  La_lm = np.zeros(L_ml.shape, dtype=np.complex128)
+  La_out = np.zeros(L_ml.shape, dtype=np.complex)
 
-  # NOTE! WILL HAVE TO CHANGE THIS if l,m are switched
-  # This is written for ordering by l first, and then m (in inner loop)
-  La_lm[:6] += np.hstack((La00, 0, 0, La20, La21, La22))
+  if group == 'l':
+    # NOTE! WILL HAVE TO CHANGE THIS if l,m are switched
+    # This is written for ordering by l first, and then m (in inner loop)
+    La_out[:6] += np.hstack((La00, 0, 0, La20, La21, La22))
+  elif group == 'm':
+    La_out[0:0+1] += La00
+    La_out[2:2+1] += La20
+    La_out[maxdeg+2:maxdeg+2+1] = La21 #complex(La21)
+    La_out[2*maxdeg+1:2*maxdeg+1+1] += La22
 
-  return La_lm
+  return La_out
   
 # Define initial values so we don't exit while loop
 # right away
@@ -393,11 +402,12 @@ while (k < k_max) and (chi >= epsilon):
   # ice, water, and sediment
   #L_lm = rho_ice*deli_lm + rho_water*delS_lm + rho_sed*Sed_lm
   L_ml = rho_ice*deli_ml + rho_water*delS_ml + rho_sed*Sed_ml
-  L_lm = reorder_l_to_m_primary(L_ml) # just around to calculate first few coeffs
+  L_lm = reorder_m_to_l_primary(L_ml) # just around to calculate first few coeffs
 
   # calculate contribution from rotation
-  La_lm = calc_rot(L_lm, love['k_el'], love['k_el_tide'])
-  La_ml = reorder_l_to_m_primary(La_lm)
+  #La_lm = calc_rot(L_lm, love['k_el'], love['k_el_tide'])
+  #La_ml = reorder_l_to_m_primary(La_lm)
+  La_ml = calc_rot(L_ml, love['k_el'], love['k_el_tide'], 'm')
 
   # calculate sea level perturbation
   # add ice and sea level and multiply with love numbers
