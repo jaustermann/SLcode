@@ -176,10 +176,11 @@ def reorder_l_to_m_primary(lm):
 
 ## Set up love number input
 
-def love_lm(num, group='l'):
+def love_lm(num, group='m'):
   """
   no dc shift also for gravity love number
   """
+  num = num[:maxdeg]
   h = np.hstack(( 0, num.squeeze() ))
   h_lm = [];
   print group
@@ -189,8 +190,8 @@ def love_lm(num, group='l'):
       h_lm += ([h[l]] * (l + 1))
   elif group == 'm':
     # This works with the spherical harmonic library I am using here
-    for m in range(maxdeg):
-      h_lm += (list(h[:m+1]))
+    for m in range(maxdeg+1):
+      h_lm += (list(h[m:]))
     # Although an analagous expression to Jerry's produces a plot that is more
     # like his...
     #for m in range(maxdeg+1):
@@ -213,12 +214,12 @@ k_lm = love_lm(love['k_el'])
 h_lm_tide = love_lm(love['h_el_tide'])
 k_lm_tide = love_lm(love['k_el_tide'])
 
-E_lm = 1 + k_lm - h_lm # 1 + G - R
+E_ml = 1 + k_lm - h_lm # 1 + G - R
                        # 1 is for self-gravity of the ice sheet itself
+#E_ml = reorder_l_to_m_primary(E_lm) # Can also select "m" option
 # Need to have proper size for the in/out grid size; set higher-order values
 # to 0
 #E_lm = np.hstack(( E_lm, np.zeros(len(oc0_lm) - len(E_lm)) )) * 0
-E_ml = reorder_l_to_m_primary(E_lm) # Can also select "m" option
 
 # Can have deg 0 term because multiplied w/ 
 # E_l and beta_l in viscous response cases,
@@ -247,8 +248,8 @@ T_ml = reorder_l_to_m_primary(T_lm)
 # to 0
 #T_lm = np.hstack(( T_lm, np.zeros(len(oc0_lm) - len(T_lm)) )) * 0
 
-E_lm_T = 1 + k_lm_tide - h_lm_tide
-E_ml_T = reorder_l_to_m_primary(E_lm_T)
+E_ml_T = 1 + k_lm_tide - h_lm_tide
+#E_ml_T = reorder_l_to_m_primary(E_lm_T)
 # Need to have proper size for the in/out grid size; set higher-order values
 # to 0
 #E_lm_T = np.hstack(( E_lm_T, np.zeros(len(oc0_lm) - len(E_lm_T)) )) * 0
