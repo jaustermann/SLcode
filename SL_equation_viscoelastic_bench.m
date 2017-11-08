@@ -1,3 +1,17 @@
+%
+%  Copyright (C) 2016 - 2017 by J. Austermann.
+%  This file is part of SLcode.
+%  SLcode is free software; you can redistribute it and/or modify
+%  it under the terms of the GNU General Public License as published by
+%  the Free Software Foundation; either version 2, or (at your option)
+%  any later version.
+%  SLcode is distributed in the hope that it will be useful,
+%  but WITHOUT ANY WARRANTY; without even the implied warranty of
+%  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+%  GNU General Public License for more details.
+%  <http://www.gnu.org/licenses/>.
+
+
 % Code to solve the elastic sea level equation following 
 % Kendall et al., 2005 and Austermann et al., 2015
 
@@ -9,7 +23,7 @@
 
 %% Parameters & Input 
 % Specify maximum degree to which spherical transformations should be done
-maxdeg = 256;
+maxdeg = 128;
 
 % Some options to choose from
 include_lakes = 'n'; % choose between y (for yes) and n (for no)
@@ -300,6 +314,7 @@ for topo_it = 1:topo_it_max;
         sdelLa_lm = zeros(length(ice_time_new)-1,length(h_lm));
         sdelI = zeros(length(ice_time_new)-1,3);
         sdelm = zeros(length(ice_time_new)-1,3);
+        ESL = 0;
 
         % update new initial topography
         topo(:,:,1) = topo_initial(:,:,topo_it);
@@ -510,6 +525,7 @@ for topo_it = 1:topo_it_max;
             TO_lm_prev = TO_lm;
             delL_lm_prev = delL_lm;
             deli_00_prev = deli_lm(1);
+            ESL(t_it) = deli_lm(1)/oc_area * rho_ice/rho_water;
             
             if include_rotation == 'y'
                 delLa_lm_prev = delLa_lm;
@@ -559,11 +575,8 @@ for i = 1:length(ice_time_new)
 end
 toc
 
-SL = zeros(size(topo));
-for i = 1:length(ice_time_new)
-    SL(:,:,i) = (topo(:,:,1) - ice_corrected(:,:,1)) - ...
-        (topo(:,:,i) - ice_corrected(:,:,i));
-end
+% calculate ESL relative to present
+ESL = ESL - ESL(end);
 
 
 %% Plot results
