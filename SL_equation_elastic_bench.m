@@ -1,5 +1,5 @@
 %
-%  Copyright (C) 2016 - 2017 by J. Austermann.
+%  Copyright (C) 2016 - 2018 by J. Austermann.
 %  This file is part of SLcode.
 %  SLcode is free software; you can redistribute it and/or modify
 %  it under the terms of the GNU General Public License as published by
@@ -24,11 +24,14 @@
 % Specify maximum degree to which spherical transformations should be done
 maxdeg = 256;
 
+include_ice_check = 'n'; % choose between y (for yes) and n (for no)
+
+
 % parameters
-rho_ice = 916;
+rho_ice = 920;
 rho_water = 1000;
 rho_sed = 2300;
-g = 9.81;
+g = 9.80665;
 
 
 % The following steps help speed up the calculations
@@ -58,14 +61,6 @@ end
 % load preloaded etopo (including ice) as topo_orig, lon_topo, lat_topo
 load topo_SL
 
-% interpolate topography grid onto Gauss Legendre Grid
-topo0 = interp2(lon_topo,lat_topo,topo_ice,lon_out, lat_out);
-
-
-% --------------------------------
-% ICE
-% --------------------------------
-
 % get topography without ice
 if N == 64
     topo_bed = topo_bed_64;
@@ -81,25 +76,18 @@ else
     topo_bed = interp2(lon_topo,lat_topo,topo_bed,lon_out,lat_out);
 end
 
-% get ice masks
-WAIS_mask = zeros(size(lon_out));
-WAIS_mask(-85 < x_GL & x_GL < -60,180 < lon_GL & lon_GL < 306) = 1;
+% --------------------------------
+% ICE
+% --------------------------------
 
-EAIS_mask = zeros(size(lon_out));
-EAIS_mask(x_GL < -60,180 > lon_GL | lon_GL > 306) = 1;
+load ice_grid/WAIS 
 
-Green_mask = zeros(size(lon_out));
-Green_mask(x_GL > 55,280 < lon_GL) = 1;
-
-
-WAIS_ice = (topo0 - topo_bed).*WAIS_mask.*(1-sign_01(topo0)).*sign_01(topo_bed);
-EAIS_ice = (topo0 - topo_bed).*EAIS_mask.*(1-sign_01(topo0)).*sign_01(topo_bed);
-Green_ice = (topo0 - topo_bed).*Green_mask.*(1-sign_01(topo0)); 
-
+ice_0_nointerp = ice_Ant;
+ice_j_nointerp = ice_EAIS;
 
 % interpolate ice masks on common grid
-ice_0 = topo0 - topo_bed;
-ice_j = ice_0 - WAIS_ice;
+ice_0 = interp2(lon_WAIS,lat_WAIS,ice_0_nointerp,lon_out, lat_out);
+ice_j = interp2(lon_WAIS,lat_WAIS,ice_j_nointerp,lon_out, lat_out);
 
 del_ice = ice_j - ice_0; 
 
@@ -122,23 +110,23 @@ del_sed = zeros(size(del_ice));
 
 %% Set up love number input
 
+% _el stands for elastic love numbers
+% _fl stands for fluid love numbers
+
 % prepare love numbers in suitable format and calculate T_lm and E_lm 
 % to calculate the fluid case, switch h_el to h_fl, k_el to k_fl and same
 % for tidal love numbers
-load SavedLN/prem.l71C.ump5.lm5.mat
-% load SavedLN/prem.l96C.ump5.lm5.mat
-h_lm = love_lm(h_fl, maxdeg);
-k_lm = love_lm(k_fl, maxdeg);
-h_lm_tide = love_lm(h_fl_tide,maxdeg);
-k_lm_tide = love_lm(k_fl_tide,maxdeg);
+%load SavedLN/prem.l20.ump5.lm10.mat
+load SavedLN/prem.l90C.umVM5.lmVM5.mat
+h_lm = love_lm(h_el, maxdeg);
+k_lm = love_lm(k_el, maxdeg);
+h_lm_tide = love_lm(h_el_tide,maxdeg);
+k_lm_tide = love_lm(k_el_tide,maxdeg);
 
 E_lm = 1 + k_lm - h_lm;
 T_lm = get_tlm(maxdeg);
 
 E_lm_T = 1 + k_lm_tide - h_lm_tide;
-
-% can switch this in if you want to exclude rotational effects
-% E_lm_T = zeros(size(E_lm_T));
 
 %% Solve sea level equation (after Kendall 2005, Dalca 2013 & Austermann et al. 2015)
 
@@ -149,7 +137,7 @@ epsilon = 10^-4; % convergence criterion
 % j = after
 
 % set up present-day topo and ocean function 
-topo_0 = topo0; % already includes ice and dynamic topography
+topo_0 = topo_bed + ice_0; 
 oc_0 = sign_01(topo_0);
 
 % set up topography and ocean function after the ice change
@@ -179,14 +167,18 @@ for k = 1:k_max % loop for sea level and topography iteration
         ocj_lm = sphere_har(oc_j,maxdeg,N,P_lm);  
         
         % CHECK ICE MODEL 
-        % check ice model for floating ice
-%         check1 = sign_01(-topo_j + ice_j);
-%         check2 = sign_01(+topo_j - ice_j) .* ...
-%          (sign_01(-ice_j*rho_ice - (topo_j - ice_j)*rho_water));
-%         
-%         ice_j_corr = check1.*ice_j + check2.*ice_j;
-%         del_ice_corrected = ice_j_corr - ice_0; 
-        del_ice_corrected = ice_j - ice_0; 
+        if include_ice_check == 'y'
+            % check ice model for floating ice
+            check1 = sign_01(-topo_j + ice_j);
+            check2 = sign_01(+topo_j - ice_j) .* ...
+                (sign_01(-ice_j*rho_ice - (topo_j - ice_j)*rho_water));
+         
+            ice_j_corr = check1.*ice_j + check2.*ice_j;
+        else
+            ice_j_corr = ice_j;
+        end
+        
+        del_ice_corrected = ice_j_corr - ice_0; 
         
         deli_lm = sphere_har(del_ice_corrected,maxdeg,N,P_lm);  
         
@@ -289,9 +281,32 @@ SL_change_rot = delSL + del_ice_corrected;
 plotSL = SL_change_rot/scaling_fact;
 
 % construct identical colormap to Mitrovica 2009 paper
+MyColorMap = [238   44  37
+    211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244
+    173 224 235;173 224 235;173 224 235;173 224 235;173 224 235;173 224 235;173 224 235;173 224 235;173 224 235;173 224 235
+    163 201 235
+    111 147 201
+    96  103 175
+    74  102 176
+    68  87  165
+    58  84  163
+    53  69  154
+    44  47  137
+    38  35  103
+    19  15  54
+    0   0   0
+    0   0   0];
+
+% plot
 figure
-hold on
-pcolor(lon_out,lat_out,plotSL)
+m_proj('hammer-aitoff','clongitude',0);
+m_pcolor([lon_out(:,end/2+1:end)-360 lon_out(:,1:end/2)],lat_out,...
+    [plotSL(:,end/2+1:end) plotSL(:,1:end/2)])
+m_coast('color',[0 0 0]);
+m_grid('box','fancy','xticklabels',[],'yticklabels',[]);
 shading flat
-contour(LON,LAT,topo_0,[0 0],'k')
-colormap(jet)
+colorbar
+colormap(MyColorMap/255)
+caxis( [-0.05, 1.6] )
+title('Sea level fingerprint of West Antarctic Ice Sheet collapse')
+
