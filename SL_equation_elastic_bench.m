@@ -141,7 +141,7 @@ topo_0 = topo_bed + ice_0;
 oc_0 = sign_01(topo_0);
 
 % set up topography and ocean function after the ice change
-topo_j = topo_0 + del_ice; % del_ice is negative -> subtract ice that is melted
+topo_j = topo_0 + del_ice + del_sed + del_DT; % del_ice is negative -> subtract ice that is melted
 oc_j = sign_01(topo_j);
 
 % calculate change in sediments and decompose into spherical harmonics
