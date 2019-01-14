@@ -4,9 +4,7 @@
 % J. Austermann 2016
 
 % add paths when run for the first time.
-% addpath SLFunctions
-% addpath '/Users/jackyaustermann/Sync/MATLAB/m_map'
-addpath /Users/jackyaustermann/Sync/SLcode/SLFunctions
+addpath SLFunctions
 
 %% Parameters & Input 
 % Specify maximum degree to which spherical transformations should be done
@@ -48,7 +46,7 @@ end
 % --------------------------------
 
 % load ice6g
-load /Users/jackyaustermann/Sync/Tools/Ice_models/ice6g/ice6g_data
+load ice_grid/ice6g_data
 ice_in = ice6g;
 
 ice = single(zeros(length(x_GL),length(lon_GL),length(ice_time)));
@@ -119,7 +117,7 @@ sed = single(zeros(length(x_GL),length(lon_GL),length(ice_time_new)));
 % for tidal love numbers
 
 %load /Users/jackyaustermann/Desktop/SLcode/SavedLN/prem.l96C.umVM5.lmVM5.mat
-load /Users/jackyaustermann/Sync/SLcode/SavedLN/prem.l96C.ump5.lm5.mat
+load SavedLN/prem.l96C.ump5.lm5.mat
 h_lm = love_lm(h_el, maxdeg);
 k_lm = love_lm(k_el, maxdeg);
 h_lm_tide = love_lm(h_el_tide,maxdeg);
@@ -129,7 +127,6 @@ E_lm = 1 + k_lm - h_lm;
 T_lm = get_tlm(maxdeg);
 
 E_lm_T = 1 + k_lm_tide - h_lm_tide;
-
 
 % calculate betas
 beta_l = cell(length(ice_time_new)-1,1);
@@ -230,7 +227,7 @@ end
 
 % initialize 
 sdelS_lm = zeros(length(ice_time_new),length(h_lm));
-
+ESL = zeros(size(ice_time_new));
 ice_corrected = ice;
 
 
@@ -293,8 +290,6 @@ for topo_it = 1:topo_it_max
         oc_0 = sign_01(topo_0);
         oc0_lm = sphere_har(oc_0,maxdeg,N,P_lm);
         ocj_lm_prev = oc0_lm;
-        
-        ESL = 0;
 
         % TIME ITERATION
         for t_it = 2:length(ice_time_new) % loop over time
@@ -452,7 +447,7 @@ for topo_it = 1:topo_it_max
             TO_lm_prev = TO_lm;
             delL_lm_prev = delL_lm;
             deli_00_prev = deli_lm(1);
-            ESL(t_it) = deli_lm(1)/oc_area * rho_ice/rho_water;
+            ESL(t_it) = -deli_lm(1)/oc_area * rho_ice/rho_water;
             
             if include_rotation == 'y'
                 delLa_lm_prev = delLa_lm;
@@ -500,6 +495,8 @@ end
 % calculate ESL relative to present
 ESL = ESL - ESL(end);
 
+
+
 clear ESL_plot ESL_plot_time
 ind = 1;
 for i = 1:2:2*length(ESL)-2
@@ -514,9 +511,7 @@ end
 
 %% Plot results at time
 
-% We only want the sea level change cause by melted ice, so subtract
-% del_ice
-fig_time = 21;
+fig_time = 18;
 ind = find(ice_time_new==fig_time);
 
 plotSL = squeeze(RSL(:,:,ind));
@@ -559,7 +554,7 @@ end
 figure
 plot(ice_time_new,RSL_pt)
 hold on
-plot(ESL_plot_time,-ESL_plot,'k')
+plot(ESL_plot_time,ESL_plot,'k')
 set(gca,'XDir','Reverse')
 xlim([0 26])
 legend({'Relative sea level','Eustatic sea level - constant ocean area'} ...
