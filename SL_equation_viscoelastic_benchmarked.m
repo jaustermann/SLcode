@@ -473,7 +473,8 @@ for topo_it = 1:topo_it_max;
                     
 
                     % convert to spherical harmonics and subtract terms that are part
-                    % of the topography to get the 'pure' sea level change
+                    % of the topography to get the SL change including ice
+                    % etc. changes (ice is part of the topography / SL change)
                     delSLcurl_fl = inv_sphere_har(delSLcurl_lm_fl,maxdeg,N,P_lm);
                     delSLcurl = delSLcurl_fl - del_ice_corrected - del_DT - del_sed;
 
