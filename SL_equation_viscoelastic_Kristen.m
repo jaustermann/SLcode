@@ -55,35 +55,46 @@ end
 % ICE
 % --------------------------------
 
-% % load WAIS 
-load ice_grid/ice5g_griddata
+% load ice6g
+load ice_grid/ice6G122k_2.mat
+ice_in = ice6g;
 
+clear ice6g
+for i = 1:122
+    ice6g(i,:,:) = flipud(ice_in(:,:,i)');
+end
+
+ice_in = ice6g;
+
+ice = single(zeros(length(x_GL),length(lon_GL),length(ice_time)));
 ice_time_new = zeros(size(ice_time));
-ice = single(zeros(length(x_GL),length(lon_GL),length(ice_time_new)));
 
-ice_lat = [90; ice_lat; -90];
-ice_long = [ice_long, 360];
+ice_lat = [90; flipud(ice_lat); -90];
+ice_long = [-0.5; ice_long; 360.5];
 
 for i = 1:length(ice_time)
 
-    % already on Gauss Legendre grid
-    ice_nointerp = squeeze(ice5g_grid(i,:,:));
+    % put onto on Gauss Legendre grid
+    ice_nointerp = squeeze(ice_in(i,:,:));
     
     % add rows at top and bottom, and right
-    ice_extended = [zeros(1,length(ice_long)-1); ice_nointerp; ...
-        ice_nointerp(1,end)*ones(1,length(ice_long)-1)];
+    ice_extended = [zeros(1,length(ice_long)-2); ice_nointerp; ...
+        ice_nointerp(1,end)*ones(1,length(ice_long)-2)];
     
-    ice_extended = [ice_extended, ice_extended(:,1)];
+    ice_extended_2 = [ice_extended(:,end), ice_extended, ice_extended(:,1)];
 
-    % interpolate ice model on Gauss Legendre grid
-    ice_interp = interp2(ice_long,ice_lat,ice_extended,lon_out, lat_out);
-
-    % patch in zeros
-    % ice_interp(isnan(ice_interp) == 1) = 0;
+    % interpolate ice masks on Gauss Legendre grid
+    ice_interp = interp2(ice_long,ice_lat,ice_extended_2,lon_out,lat_out);
     
-    ice(:,:,length(ice_time)-i+1) = ice_interp;
-    ice_time_new(i) = ice_time(length(ice_time)-i+1);
+    ice(:,:,i) = ice_interp;
+    ice_time_new(i) = ice_time(i);
 end
+
+% time: ice_time_new
+% ice model: ice
+
+% ice -- on lon_out, lat_out
+% ice_time_new -- old to young
 
 % --------------------------------
 % TOPOGRAPHY
@@ -230,6 +241,7 @@ end
 
 % initialize 
 ice_corrected = ice;
+sdelS_lm = zeros(length(ice_time_new),length(h_lm));
 
 % initial values for convergence
 conv_topo = 'not converged yet';
@@ -501,7 +513,7 @@ ESL = -(ESL - ESL(end));
 fig_time = 20;
 ind = find(ice_time_new==fig_time);
 
-plotSL = squeeze(RSL(:,:,ind));
+plotSL = ice(:,:,22); %squeeze(RSL(:,:,ind));
 
 % plot
 figure
@@ -510,7 +522,7 @@ m_proj('robinson','clongitude',0);
 m_pcolor([lon_out(:,end/2+1:end)-360 lon_out(:,1:end/2)],lat_out,...
     [plotSL(:,end/2+1:end) plotSL(:,1:end/2)])
 m_contour([lon_out(:,end/2+1:end)-360 lon_out(:,1:end/2)],lat_out,...
-    [topo(:,end/2+1:end,ind) topo(:,1:end/2,ind)],[0 0],'k')
+    [topo(:,end/2+1:end,ind) topo(:,1:end/2,ind)],[0 0],'w')
 %m_coast('color',[0 0 0]);
 m_grid('box','fancy','xticklabels',[],'yticklabels',[]);
 shading flat
