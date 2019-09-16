@@ -8,11 +8,11 @@ addpath SLFunctions
 
 %% Parameters & Input 
 % Specify maximum degree to which spherical transformations should be done
-maxdeg = 128;
+maxdeg = 64;
 
 % Some options to choose from
 include_rotation = 'y'; % choose between y (for yes) and n (for no)
-include_ice_check = 'y'; % choose between y (for yes) and n (for no)
+include_ice_check = 'n'; % choose between y (for yes) and n (for no)
 
 % parameters
 rho_ice = 920;
@@ -46,13 +46,20 @@ end
 % --------------------------------
 
 % load ice6g
-load ice_grid/ice6g_data
+load ice_grid/ice6G122k_2.mat
+ice_in = ice6g;
+
+clear ice6g
+for i = 1:122
+    ice6g(i,:,:) = flipud(ice_in(:,:,i)');
+end
+
 ice_in = ice6g;
 
 ice = single(zeros(length(x_GL),length(lon_GL),length(ice_time)));
 ice_time_new = zeros(size(ice_time));
 
-ice_lat = [90; ice_lat; -90];
+ice_lat = [90; flipud(ice_lat); -90];
 ice_long = [-0.5; ice_long; 360.5];
 
 for i = 1:length(ice_time)
@@ -69,8 +76,8 @@ for i = 1:length(ice_time)
     % interpolate ice masks on Gauss Legendre grid
     ice_interp = interp2(ice_long,ice_lat,ice_extended_2,lon_out,lat_out);
     
-    ice(:,:,length(ice_time)-i+1) = ice_interp;
-    ice_time_new(i) = ice_time(length(ice_time)-i+1);
+    ice(:,:,i) = ice_interp;
+    ice_time_new(i) = ice_time(i);
 end
 
 % --------------------------------
@@ -117,7 +124,8 @@ sed = single(zeros(length(x_GL),length(lon_GL),length(ice_time_new)));
 % for tidal love numbers
 
 %load /Users/jackyaustermann/Desktop/SLcode/SavedLN/prem.l96C.umVM5.lmVM5.mat
-load SavedLN/prem.l96C.ump5.lm5.mat
+%load SavedLN/prem.l96C.ump5.lm5.mat
+load SavedLN/prem.l96C.umVM5.lmVM5.mat
 h_lm = love_lm(h_el, maxdeg);
 k_lm = love_lm(k_el, maxdeg);
 h_lm_tide = love_lm(h_el_tide,maxdeg);
@@ -511,10 +519,10 @@ end
 
 %% Plot results at time
 
-fig_time = 18;
+fig_time = 16;
 ind = find(ice_time_new==fig_time);
 
-plotSL = squeeze(RSL(:,:,ind));
+plotSL = squeeze(RSL(:,:,ind)-ESL(ind));
 
 figure
 hold on
@@ -524,7 +532,11 @@ shading flat
 contour(lon_out,lat_out,topo_pres,[0 0],'k')
 %caxis([-20 20])
 colorbar
+plot(lon_pt,lat_pt,'ro')
+contour(lon_out,lat_out,squeeze(ice(:,:,ind)),[1 1],'b')
 
+%col = othercolor('BuOr_10');
+colormap(col)
 % if using m_Map
 % % plot
 % figure
@@ -540,8 +552,8 @@ colorbar
 
 %% Plot results at point
 
-lon_pt = 90;
-lat_pt = 22;
+lon_pt = 286;
+lat_pt = 40;
 
 % We only want the sea level change cause by melted ice, so subtract
 % del_ice
@@ -554,9 +566,10 @@ end
 figure
 plot(ice_time_new,RSL_pt)
 hold on
-plot(ESL_plot_time,ESL_plot,'k')
+%plot(ESL_plot_time,ESL_plot,'k')
+plot(ice_time_new,ESL,'k')
 set(gca,'XDir','Reverse')
-xlim([0 26])
+%xlim([0 26])
 legend({'Relative sea level','Eustatic sea level - constant ocean area'} ...
     ,'Location','NorthWest','FontSize',12)
 xlabel('time (ka)')
