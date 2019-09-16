@@ -23,7 +23,7 @@
 
 %% Parameters & Input 
 % Specify maximum degree to which spherical transformations should be done
-maxdeg = 256;
+maxdeg = 128;
 
 % Some options to choose from
 include_rotation = 'y'; % choose between y (for yes) and n (for no)
@@ -513,19 +513,37 @@ ESL = -(ESL - ESL(end));
 fig_time = 20;
 ind = find(ice_time_new==fig_time);
 
-plotSL = ice(:,:,22); %squeeze(RSL(:,:,ind));
+plotSL = squeeze(RSL(:,:,ind));
 
 % plot
 figure
 hold on
-m_proj('robinson','clongitude',0);
-m_pcolor([lon_out(:,end/2+1:end)-360 lon_out(:,1:end/2)],lat_out,...
+pcolor([lon_out(:,end/2+1:end)-360 lon_out(:,1:end/2)],lat_out,...
     [plotSL(:,end/2+1:end) plotSL(:,1:end/2)])
-m_contour([lon_out(:,end/2+1:end)-360 lon_out(:,1:end/2)],lat_out,...
+contour([lon_out(:,end/2+1:end)-360 lon_out(:,1:end/2)],lat_out,...
     [topo(:,end/2+1:end,ind) topo(:,1:end/2,ind)],[0 0],'w')
-%m_coast('color',[0 0 0]);
-m_grid('box','fancy','xticklabels',[],'yticklabels',[]);
 shading flat
 colorbar
 colormap(jet)
 
+
+%% Plot results at point
+
+lon_pt = 301;
+lat_pt = 13;
+
+% We only want the sea level change cause by melted ice, so subtract
+% del_ice
+clear RSL_pt
+for i = 1:length(ice_time_new)
+    RSL_pt(i) = interp2(lon_out,lat_out,squeeze(RSL(:,:,i)),lon_pt,lat_pt);
+end
+
+% plot
+figure
+plot(ice_time_new,RSL_pt)
+hold on
+xlim([0 122])
+%plot(ESL_plot_time,-ESL_plot,'k')
+%set(gca,'XDir','Reverse')
+%axis([0 120 -140 10])
