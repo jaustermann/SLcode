@@ -23,11 +23,11 @@
 
 %% Parameters & Input 
 % Specify maximum degree to which spherical transformations should be done
-maxdeg = 128;
+maxdeg = 256;
 
 % Some options to choose from
 include_rotation = 'y'; % choose between y (for yes) and n (for no)
-include_ice_check = 'y'; % choose between y (for yes) and n (for no)
+include_ice_check = 'n'; % choose between y (for yes) and n (for no)
 
 % parameters
 rho_ice = 920;
@@ -131,7 +131,7 @@ oc_area = ocpres_lm(1);
 % to calculate the fluid case, switch h_el to h_fl, k_el to k_fl and same
 % for tidal love numbers
 
-load SavedLN/prem.l90C.umVM2.lmVM2.mat
+load SavedLN/prem.l96C.ump5.lm20.mat
 h_lm = love_lm(h_el, maxdeg);
 k_lm = love_lm(k_el, maxdeg);
 h_lm_tide = love_lm(h_el_tide,maxdeg);
@@ -289,7 +289,7 @@ for topo_it = 1:topo_it_max;
             else
                 % if the floating ice check is set to 'n' that don't change the
                 % ice model
-                 ice_corrected(:,:,i) = ice_j;
+                 ice_corrected(:,:,i) = ice(:,:,i);
             end
         end
 
@@ -510,7 +510,7 @@ ESL = -(ESL - ESL(end));
 
 % We only want the sea level change cause by melted ice, so subtract
 % del_ice
-fig_time = 20;
+fig_time = 21;
 ind = find(ice_time_new==fig_time);
 
 plotSL = squeeze(RSL(:,:,ind));
@@ -529,8 +529,8 @@ colormap(jet)
 
 %% Plot results at point
 
-lon_pt = 301;
-lat_pt = 13;
+lon_pt = 360-53.5;
+lat_pt = 66.5;
 
 % We only want the sea level change cause by melted ice, so subtract
 % del_ice

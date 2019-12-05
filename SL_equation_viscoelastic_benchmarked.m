@@ -526,7 +526,7 @@ for topo_it = 1:topo_it_max;
             TO_lm_prev = TO_lm;
             delL_lm_prev = delL_lm;
             deli_00_prev = deli_lm(1);
-            ESL(t_it) = deli_lm(1)/oc_area * rho_ice/rho_water;
+            %ESL(t_it) = deli_lm(1)/oc_area * rho_ice/rho_water;
             
             if include_rotation == 'y'
                 delLa_lm_prev = delLa_lm;
