@@ -80,10 +80,16 @@ end
 % ICE
 % --------------------------------
 
-load ice_grid/WAIS 
+load ice_grid/WAIS
 
-ice_0_nointerp = ice_Ant;
-ice_j_nointerp = ice_EAIS;
+% ice_0_nointerp = ice_Ant;
+% ice_j_nointerp = ice_EAIS;
+
+
+load ice_grid/ice_masks
+% 
+ice_0_nointerp = Greenland_mask;
+ice_j_nointerp = zeros(size(Greenland_mask));
 
 % interpolate ice masks on common grid
 ice_0 = interp2(lon_WAIS,lat_WAIS,ice_0_nointerp,lon_out, lat_out);
@@ -205,6 +211,7 @@ for k = 1:k_max % loop for sea level and topography iteration
 
         % calculate contribution from rotation
         La_lm = calc_rot(L_lm,k_el,k_el_tide);
+        La_lm = zeros(size(La_lm));
 
         % calculate sea level perturbation
         % add ice and sea level and multiply with love numbers
@@ -265,11 +272,41 @@ end
 % calculate the scaling to normalize the fingerprint (it's normalized to be
 % one on average, when averaged over the final ocean basin). 
 % calculate change in sea level over final ocean basin
-del_scaling =(delSL + del_ice_corrected).*oc_j;
+del_scaling =(delSL + del_ice_corrected).*oc_0;
 % get the average of that when spreading the water over the whole globe
-sca = spa2sph(del_scaling,1,lon,colat);
+sca = sphere_har(del_scaling,0,N,P_lm); 
 % get the average of that when spreading the water only over the oceans.
-scaling_fact = sca(1)/ocj_lm(1);  
+scaling_fact = sca(1)/oc0_lm(1);  
+
+%%
+% 
+% % get bathymetry
+% mask0 = sign_01(topo_0);
+% temp0 = mask0.*(topo_0);
+% A_oc0 = sphere_har(oc_0,0,N,P_lm);
+% 
+% %for it = 1:length(ice_time_new)
+%  
+%     % get the ocean area
+%    oc_j = sign_01(topo_j);
+%    maskj = sign_01(topo_j);
+%    tempj = mask.*(topo_j);
+%    A_ocj = sphere_har(oc_j,0,N,P_lm);
+% 
+%     % calculate the change in ocean volume and divide by the ocean area at each time
+%     Vol_rsl = sphere_har(tempj-temp0,0,N,P_lm);
+%     ESL_rsl = -Vol_rsl/A_ocj;
+% %end
+% 
+% %     Vol_j = sphere_har(tempj,0,N,P_lm);
+% %     Vol_0 = sphere_har(temp0,0,N,P_lm);
+% %     ESL_rsl = Vol_j/A_ocj - Vol_0/A_oc0;
+%     
+% 
+% % spreading water equally around the present-day ocean area
+% ESL = -deli_lm(1)/A_ocj * rho_ice/rho_water; % change A_oc0 to A_ocj for spreading it over the ocean area at time j
+
+
 
 
 %% Plot results
@@ -280,6 +317,7 @@ SL_change_rot = delSL + del_ice_corrected;
 % normalize it by the scaling factor
 plotSL = SL_change_rot/scaling_fact;
 
+%plotSL = (plotSL - SL_change_rot/scaling_fact)./(SL_change_rot/scaling_fact);
 % construct identical colormap to Mitrovica 2009 paper
 MyColorMap = [238   44  37
     211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244;211 238 244

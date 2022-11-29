@@ -1,15 +1,15 @@
 function [La_lm, sdelI, sdelm] = calc_rot_visc(L_lm,k_L,k_T,t_it,beta_konly_l, ...
-    beta_konly_tide, sdelI, sdelm, length_of_day)
+    beta_konly_tide, sdelI, sdelm)
 
 % constants:
 G = 6.67408E-11;
-k_f = 0.942; % from Mitrovica et al., 2005
+k_f = 0.942;% from Mitrovica et al., 2005
 
-if nargin == 9
-    omega = 2*pi/length_of_day/(60*60);
-else
-    omega = 7.292E-5;
-end
+% if nargin == 9
+%     omega = 2*pi/length_of_day/(60*60);
+% else
+omega = 7.292E-5;
+% end
 %omega = 2*pi/(21.5*(23+56/60)/24*60*60);
 a = 6371000;
 %CminA = 2.6347269E35;

@@ -23,7 +23,7 @@
 
 %% Parameters & Input 
 % Specify maximum degree to which spherical transformations should be done
-maxdeg = 256;
+maxdeg = 256; 
 
 % Some options to choose from
 include_rotation = 'y'; % choose between y (for yes) and n (for no)
@@ -56,7 +56,7 @@ end
 % --------------------------------
 
 % load ice6g
-load ice_grid/ice6G122k_2.mat
+load ~/Sync/SLcode/ice_grid/ice6G122k_2.mat
 ice_in = ice6g;
 
 clear ice6g
@@ -96,6 +96,10 @@ end
 % ice -- on lon_out, lat_out
 % ice_time_new -- old to young
 
+% determine what index refers to present-day for the topography iteration
+ind_pres = find(ice_time_new == 0);
+
+
 % --------------------------------
 % TOPOGRAPHY
 % --------------------------------
@@ -106,17 +110,17 @@ load topo_SL
 
 % interpolate topography grid onto Gauss Legendre Grid
 if N == 64
-    topo_pres = topo_bed_64 + ice(:,:,end);
+    topo_pres = topo_bed_64 + ice(:,:,ind_pres);
 elseif N == 128
-    topo_pres = topo_bed_128 + ice(:,:,end);
+    topo_pres = topo_bed_128 + ice(:,:,ind_pres);
 elseif N == 256
-    topo_pres = topo_bed_256 + ice(:,:,end);
+    topo_pres = topo_bed_256 + ice(:,:,ind_pres);
 elseif N == 512
-    topo_pres = topo_bed_512 + ice(:,:,end);
+    topo_pres = topo_bed_512 + ice(:,:,ind_pres);
 elseif N == 1024
-    topo_pres = topo_bed_1024 + ice(:,:,end);
+    topo_pres = topo_bed_1024 + ice(:,:,ind_pres);
 else
-    topo_pres = interp2(lon_topo,lat_topo,topo_bed,lon_out,lat_out) + ice(:,:,end);
+    topo_pres = interp2(lon_topo,lat_topo,topo_bed,lon_out,lat_out) + ice(:,:,ind_pres);
 end
 
 oc_pres = sign_01(topo_pres);
@@ -228,16 +232,15 @@ max_topo_diff = 1; % convergence criterion
 
 % set up initial topography and ocean function
 topo_initial = zeros(length(x_GL),length(lon_GL),topo_it_max+1);
-topo_initial(:,:,1) = topo_pres - ice(:,:,end) + ice(:,:,1); % already includes ice, DT and sediments
+topo_initial(:,:,1) = topo_pres - ice(:,:,ind_pres) + ice(:,:,1); % already includes ice, DT and sediments
 
 % initial topography guess: topography is the same as present at every
 % point in time; topography is a 3D vector; access topography at time x
 % like this topo(:,:,x) [or for plotting squeeze(topo(:,:,x))]
 topo = zeros(length(x_GL),length(lon_GL),length(ice_time_new));
 for i = 2:length(ice_time_new)
-    topo(:,:,i) = topo_pres - ice(:,:,end) + ice(:,:,i);
+    topo(:,:,i) = topo_pres - ice(:,:,ind_pres) + ice(:,:,i);
 end
-
 
 % initialize 
 ice_corrected = ice;
@@ -247,7 +250,7 @@ sdelS_lm = zeros(length(ice_time_new),length(h_lm));
 conv_topo = 'not converged yet';
 
 % TOPOGRAPHY ITERATION
-for topo_it = 1:topo_it_max;
+for topo_it = 1:topo_it_max
     
     switch conv_topo
 
@@ -472,11 +475,12 @@ for topo_it = 1:topo_it_max;
 
         end
 
-        topo_pres_ice_corrected = topo_pres - ice(:,:,end) + ice_corrected(:,:,end);
+       
+        topo_pres_ice_corrected = topo_pres - ice(:,:,ind_pres) + ice_corrected(:,:,ind_pres);
 
-        topo_diff = max(max(abs(topo(:,:,end) - topo_pres_ice_corrected)));
+        topo_diff = max(max(abs(topo(:,:,ind_pres) - topo_pres_ice_corrected)));
 
-        if topo_diff < max_topo_diff;
+        if topo_diff < max_topo_diff
             conv_topo = 'converged!';
             disp(['Converged!! Number of topo iterations ' num2str(topo_it) ...
                 '. Topo_diff is ' num2str(topo_diff)])
@@ -489,7 +493,7 @@ for topo_it = 1:topo_it_max;
     end
     
     % update initial topography
-    topo_initial(:,:,topo_it+1) = topo_pres_ice_corrected - (topo(:,:,end) - topo(:,:,1));
+    topo_initial(:,:,topo_it+1) = topo_pres_ice_corrected - (topo(:,:,ind_pres) - topo(:,:,1));
     
 end
 
@@ -497,13 +501,13 @@ end
 % therefore need to subtract it here)
 RSL = zeros(size(topo));
 for i = 1:length(ice_time_new)
-    RSL(:,:,i) = (topo(:,:,end) - ice_corrected(:,:,end)) - ...
+    RSL(:,:,i) = (topo(:,:,ind_pres) - ice_corrected(:,:,ind_pres)) - ...
         (topo(:,:,i) - ice_corrected(:,:,i));
 end
 toc
 
 % calculate ESL relative to present
-ESL = -(ESL - ESL(end));
+ESL = -(ESL - ESL(ind_pres));
 
 
 %% Plot results
