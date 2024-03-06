@@ -2,8 +2,11 @@ function [ F_yx ] = inv_sphere_har( vec_in, maxdeg, N, varargin)
 
 % if not already generated, generate Legendre Polynomials
 if nargin == 3
+    [xGQ,~] = GaussQuad(N);
+    x_GL = acos(xGQ)*180/pi - 90;
+    colat_rad = (90-x_GL)*pi/180;
+    x = cos(colat_rad);
     for l=0:N
-        [x,w] = GaussQuad(N);
         P_lm{l+1} = legendre(l,x,'norm');
     end
 else

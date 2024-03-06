@@ -27,7 +27,7 @@ maxdeg = 256;
 
 % Some options to choose from
 include_rotation = 'y'; % choose between y (for yes) and n (for no)
-include_ice_check = 'n'; % choose between y (for yes) and n (for no)
+include_ice_check = 'y'; % choose between y (for yes) and n (for no)
 
 % parameters
 rho_ice = 920;
@@ -38,8 +38,10 @@ g = 9.80665;
 % The following steps help speed up the calculations
 % Set up Gauss Legendre grid onto which to interpolate all grids
 N = maxdeg; 
-[x,w] = GaussQuad(N);
-x_GL = acos(x)*180/pi - 90;
+[xGQ,w] = GaussQuad(N);
+x_GL = acos(xGQ)*180/pi - 90;
+colat_rad = (90-x_GL)*pi/180;
+x = cos(colat_rad);
 lon_GL = linspace(0,360,2*N+1);
 lon_GL = lon_GL(1:end-1);
 
@@ -135,11 +137,17 @@ oc_area = ocpres_lm(1);
 % to calculate the fluid case, switch h_el to h_fl, k_el to k_fl and same
 % for tidal love numbers
 
-load SavedLN/prem.l96C.ump5.lm20.mat
+load SavedLN/prem.l96C.ump5.lm5.mat
 h_lm = love_lm(h_el, maxdeg);
 k_lm = love_lm(k_el, maxdeg);
 h_lm_tide = love_lm(h_el_tide,maxdeg);
 k_lm_tide = love_lm(k_el_tide,maxdeg);
+
+% the degree 1 component is in a reference frame that is shifting significantly. 
+% We will change this here into a center of mass of the solid Earth reference 
+% frame in which k_amp(1,:) is 0. 
+h_amp(1,:) = h_amp(1,:) - k_amp(1,:);
+k_amp(1,:) = zeros(size(k_amp(1,:)));
 
 E_lm = 1 + k_lm - h_lm;
 T_lm = get_tlm(maxdeg);
@@ -533,8 +541,8 @@ colormap(jet)
 
 %% Plot results at point
 
-lon_pt = 360-53.5;
-lat_pt = 66.5;
+lon_pt = 360-123;
+lat_pt = -12;
 
 % We only want the sea level change cause by melted ice, so subtract
 % del_ice

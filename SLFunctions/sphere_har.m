@@ -1,8 +1,11 @@
 function [ a_lm ] = sphere_har( F_yx, maxdeg, N, varargin)
 
 % if not already generated, generate Legendre Polynomials
-[x,w] = GaussQuad(N);
+[xGQ,w] = GaussQuad(N);
 if nargin == 3
+    x_GL = acos(xGQ)*180/pi - 90;
+    colat_rad = (90-x_GL)*pi/180;
+    x = cos(colat_rad);
     for l=0:N
         P_lm{l+1} = legendre(l,x,'norm');
     end
