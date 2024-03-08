@@ -68,6 +68,7 @@ end
 
 ice_in = ice6g;
 
+
 ice = single(zeros(length(x_GL),length(lon_GL),length(ice_time)));
 ice_time_new = zeros(size(ice_time));
 
@@ -137,7 +138,7 @@ oc_area = ocpres_lm(1);
 % to calculate the fluid case, switch h_el to h_fl, k_el to k_fl and same
 % for tidal love numbers
 
-load SavedLN/prem.l96C.ump5.lm5.mat
+load SavedLN/prem.l96C.umVM5.lmVM5.mat
 h_lm = love_lm(h_el, maxdeg);
 k_lm = love_lm(k_el, maxdeg);
 h_lm_tide = love_lm(h_el_tide,maxdeg);
@@ -253,6 +254,8 @@ end
 % initialize 
 ice_corrected = ice;
 sdelS_lm = zeros(length(ice_time_new),length(h_lm));
+ESL = zeros(1,length(ice_time_new));
+sdelI_00 = zeros(1,length(ice_time_new));
 
 % initial values for convergence
 conv_topo = 'not converged yet';
@@ -467,6 +470,7 @@ for topo_it = 1:topo_it_max
             delL_lm_prev = delL_lm;
             deli_00_prev = deli_lm(1);
             ESL(t_it) = deli_lm(1)/oc_area * rho_ice/rho_water;
+            sdelI_00(t_it) = sdeli_00;
             
             if include_rotation == 'y'
                 delLa_lm_prev = delLa_lm;
@@ -516,6 +520,28 @@ toc
 
 % calculate ESL relative to present
 ESL = -(ESL - ESL(ind_pres));
+
+%% calculate GMSL for a changing ocean area following equation 1 of Lambeck et al. (2014)
+
+oc_area_time = zeros(1,length(ice_time_new));
+
+%Calculate ocean area through time
+for i = 1:length(ice_time_new)
+    oc_pres = sign_01(squeeze(topo(:,:,i)));
+    oc_area_time(i) = sphere_har(oc_pres,0,N,P_lm);
+end
+
+oc_area_rev = flip(oc_area_time);
+sdelI_00_rev = flip(sdelI_00);
+sdelI_00_rev = [0 sdelI_00_rev(1:end-1)]; % set it to 0 at time 0
+
+GMSL(1) = 0; % at present it's 0
+for i = 2:length(ice_time_new)
+    temp = rho_ice/rho_water * sdelI_00_rev(i)/oc_area_rev(i);
+    GMSL(i) = GMSL(i-1) + temp;
+end
+
+GMSL = flip(GMSL);
 
 
 %% Plot results
