@@ -77,7 +77,7 @@ end
 
 % comment in to load fingerprint ice history
 load ice_grid/fingerprint_melt.mat
-%ice = Greenland_melt;
+ice = Greenland_melt;
 %ice = WAIS_melt;
 
 % to plot ice at a timestep X
@@ -87,7 +87,7 @@ load ice_grid/fingerprint_melt.mat
 % contour(lon_out,lat_out,)
 
 % comment in load deglacial ice history
-load ice_grid/ice7g_40ka_GL256.mat
+%load ice_grid/ice7g_40ka_GL256.mat
 % - This is the ICE-7G model (Roy and Peltier, 2017; 2018). The published
 % model extends from 26 ka to present. We extended this model to 40 ka using 
 % the Waelbroeck et al. (2002) sea level reconstruction, assuming times of
