@@ -329,7 +329,7 @@ def calc_rot(L_in, _k, _k_tide, group='l'):
   La2m1 = -1 * np.conj(La21)
   La2m2 = 1 * np.conj(La22)
 
-  La_out = np.zeros(L_ml.shape, dtype=np.complex)
+  La_out = np.zeros(L_ml.shape, dtype=complex)
 
   if group == 'l':
     # NOTE! WILL HAVE TO CHANGE THIS if l,m are switched
