@@ -32,7 +32,7 @@ class Spharmt(object):
         self.ntrunc = ntrunc
         self.nlm = self._shtns.nlm
         self.degree = self._shtns.l
-        self.lap = -self.degree*(self.degree+1.0).astype(np.complex)
+        self.lap = -self.degree*(self.degree+1.0).astype(complex)
         self.invlap = np.zeros(self.lap.shape, self.lap.dtype)
         self.invlap[1:] = 1./self.lap[1:]
         self.rsphere = rsphere
@@ -41,7 +41,7 @@ class Spharmt(object):
     def grdtospec(self,data,norm='sqrt4pi'):
         """compute spectral coefficients from gridded data"""
         data = np.ascontiguousarray(data, dtype=np.float)
-        dataspec = np.empty(self.nlm, dtype=np.complex)
+        dataspec = np.empty(self.nlm, dtype=complex)
         self._shtns.spat_to_SH(data, dataspec)
         if norm == 'unity':
           dataspec /= np.sqrt(4*np.pi) # this is for sea-level model
@@ -52,7 +52,7 @@ class Spharmt(object):
         return dataspec
     def spectogrd(self,dataspec,norm='sqrt4pi'):
         """compute gridded data from spectral coefficients"""
-        dataspec = np.ascontiguousarray(dataspec, dtype=np.complex)
+        dataspec = np.ascontiguousarray(dataspec, dtype=complex)
         if norm == 'unity':
           dataspec *= np.sqrt(4*np.pi) # this is for sea-level model
         elif norm == 'sqrt4pi':
@@ -64,8 +64,8 @@ class Spharmt(object):
         return data
     def getuv(self,vrtspec,divspec):
         """compute wind vector from spectral coeffs of vorticity and divergence"""
-        vrtspec = np.ascontiguousarray(vrtspec, dtype=np.complex)
-        divspec = np.ascontiguousarray(divspec, dtype=np.complex)
+        vrtspec = np.ascontiguousarray(vrtspec, dtype=complex)
+        divspec = np.ascontiguousarray(divspec, dtype=complex)
         u = np.empty((self.nlats,self.nlons), dtype=np.float)
         v = np.empty((self.nlats,self.nlons), dtype=np.float)
         self._shtns.SHsphtor_to_spat((self.invlap/self.rsphere)*vrtspec,\
@@ -75,14 +75,14 @@ class Spharmt(object):
         """compute spectral coeffs of vorticity and divergence from wind vector"""
         u = np.ascontiguousarray(u, dtype=np.float)
         v = np.ascontiguousarray(v, dtype=np.float)
-        vrtspec = np.empty(self.nlm, dtype=np.complex)
-        divspec = np.empty(self.nlm, dtype=np.complex)
+        vrtspec = np.empty(self.nlm, dtype=complex)
+        divspec = np.empty(self.nlm, dtype=complex)
         self._shtns.spat_to_SHsphtor(u, v, vrtspec, divspec)
         return self.lap*self.rsphere*vrtspec, self.lap*rsphere*divspec
     def getgrad(self,divspec):
         """compute gradient vector from spectral coeffs"""
-        divspec = np.ascontiguousarray(divspec, dtype=np.complex)
-        vrtspec = np.zeros(divspec.shape, dtype=np.complex)
+        divspec = np.ascontiguousarray(divspec, dtype=complex)
+        vrtspec = np.zeros(divspec.shape, dtype=complex)
         u = np.empty((self.nlats,self.nlons), dtype=np.float)
         v = np.empty((self.nlats,self.nlons), dtype=np.float)
         self._shtns.SHsphtor_to_spat(vrtspec,divspec)
@@ -179,9 +179,9 @@ if __name__ == "__main__":
     phispec = x.grdtospec(phig)
 
     # initialize spectral tendency arrays
-    ddivdtspec = np.zeros(vrtspec.shape+(3,), np.complex)
-    dvrtdtspec = np.zeros(vrtspec.shape+(3,), np.complex)
-    dphidtspec = np.zeros(vrtspec.shape+(3,), np.complex)
+    ddivdtspec = np.zeros(vrtspec.shape+(3,), complex)
+    dvrtdtspec = np.zeros(vrtspec.shape+(3,), complex)
+    dphidtspec = np.zeros(vrtspec.shape+(3,), complex)
     nnew = 0; nnow = 1; nold = 2
 
     # time loop.
