@@ -182,8 +182,8 @@ def love_lm(num, group='m'):
   """
   num = num[:maxdeg]
   h = np.hstack(( 0, num.squeeze() ))
-  h_lm = [];
-  print group
+  h_lm = []
+  print (group)
   if group == 'l':
     # This is the standard for Jerry's code
     for l in range(maxdeg+1):
@@ -295,13 +295,13 @@ def calc_rot(L_in, _k, _k_tide, group='l'):
     L20 = L_in[3]
     L21 = L_in[4] 
     L22 = L_in[5]
-    print L22
+    print (L22)
   elif group == 'm':
-    print "WARN: hard-coded max l,m; will break!"
+    print ("WARN: hard-coded max l,m; will break!")
     L20 = L_in[2]
     L21 = L_in[maxdeg+2]
     L22 = L_in[2*maxdeg + 1]
-    print L22
+    print (L22)
   k_L = _k[1] # This has 256 values
   k_T = _k_tide[1] # This has 256 values
 
@@ -355,7 +355,7 @@ start_time = time.time()
 # Iteration criterion epsilon
 while (k < k_max) and (chi >= epsilon):
 
-  #print chi
+  #print (chi)
 
   # expand ocean function into spherical harmonics
   # in m-first ordering
@@ -467,14 +467,14 @@ while (k < k_max) and (chi >= epsilon):
   k += 1
 
 if chi < epsilon:
-  print 'Converged after iteration', k, 'Chi was', chi
+  print ('Converged after iteration', k, 'Chi was', chi)
 else:
-  print 'Did not yet converge.'
-  print 'Finished iteration', k, '; Chi was', chi
+  print ('Did not yet converge.')
+  print ('Finished iteration', k, '; Chi was', chi)
 
 end_time = time.time()
 
-print "Time elapsed in k loop", end_time - start_time
+print ("Time elapsed in k loop", end_time - start_time)
 
 # calculate the scaling to normalize the fingerprint (it's normalized to be
 # one on average, when averaged over the final ocean basin). 
